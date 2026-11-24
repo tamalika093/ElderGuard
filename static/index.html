@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ElderGuard - Remote Care & Emergency Live Alert System</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Leaflet Map CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+            },
+            emergency: {
+              500: '#ef4444',
+              600: '#dc2626',
+              700: '#b91c1c',
+            }
+          },
+          animation: {
+            'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'ping-slow': 'ping 2s cubic-bezier(0, 0, 0.2, 1) infinite',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    /* Flashing red SOS effect */
+    @keyframes redStrobe {
+      0%, 100% { background-color: rgba(220, 38, 38, 0.95); }
+      50% { background-color: rgba(153, 27, 27, 0.98); }
+    }
+    .strobe-alert {
+      animation: redStrobe 0.8s infinite;
+    }
+
+    /* Ringing amber alarm effect */
+    @keyframes amberPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
+      50% { box-shadow: 0 0 30px 15px rgba(245, 158, 11, 0.3); }
+    }
+    .amber-alarm-pulse {
+      animation: amberPulse 1.5s infinite;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans min-h-screen flex flex-col antialiased selection:bg-emerald-500 selection:text-white">
+
+  <!-- Top Navigation & Presentation Bar -->
+  <header class="bg-slate-950/90 border-b border-slate-800 sticky top-0 z-50 backdrop-blur-md px-4 py-3">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      
+      <!-- Brand & Tagline -->
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white font-extrabold text-xl">
+          🛡️
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="text-xl font-bold tracking-tight text-white">Elder<span class="text-emerald-400">Guard</span></h1>
+            <span class="px-2 py-0.5 text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full">Live Alert Sync</span>
+            <span class="px-2 py-0.5 text-xs font-semibold bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-full hidden sm:inline-block">Hackathon Demo</span>
+          </div>
+          <p class="text-xs text-slate-400">Remote Caregiver Medication Alarms & Emergency Lock-Screen SOS</p>
+        </div>
+      </div>
+
+      <!-- Live Sync Status & View Switcher -->
+      <div class="flex items-center space-x-2 bg-slate-900 p-1.5 rounded-xl border border-slate-800">
+        <button onclick="setViewMode('multi')" id="btn-view-multi" class="view-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-emerald-600 text-white shadow-sm">
+          📺 Triple-Screen Presentation
+        </button>
+        <button onclick="setViewMode('caregiver')" id="btn-view-caregiver" class="view-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-all">
+          👦 Child Portal (Kolkata)
+        </button>
+        <button onclick="setViewMode('parent')" id="btn-view-parent" class="view-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-all">
+          👴 Parents Phone (Delhi)
+        </button>
+        <button onclick="setViewMode('hospital')" id="btn-view-hospital" class="view-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-all">
+          🏥 Hospital Dispatch
+        </button>
+      </div>
+
+      <!-- Quick Action Controls for Hackathon Pitch -->
+      <div class="flex items-center space-x-2">
+        <button onclick="testAudioEngine()" class="px-2.5 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 flex items-center space-x-1.5" title="Test browser siren & speech synthesis">
+          <span>🔊</span> <span class="hidden md:inline">Test Audio</span>
+        </button>
+        <button onclick="resetDemoState()" class="px-2.5 py-1.5 text-xs font-medium bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/40 rounded-lg flex items-center space-x-1" title="Reset state for next demo round">
+          <span>🔄</span> <span>Reset Demo</span>
+        </button>
+        <div class="flex items-center space-x-1.5 pl-2 border-l border-slate-800 text-xs">
+          <span id="conn-indicator" class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span id="conn-text" class="text-slate-400 hidden lg:inline">Realtime Live</span>
+        </div>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Banner for Audio Enable (Required for browser autoplay policies) -->
+  <div id="audio-notice" class="bg-indigo-950/80 border-b border-indigo-800/50 px-4 py-2 text-center text-xs text-indigo-200 flex items-center justify-center space-x-2">
+    <span>💡 <strong>Audio Engine Initialized:</strong> Click anywhere on the page to enable synthetic alarm siren and voice announcements during live demo.</span>
+    <button onclick="dismissAudioNotice()" class="underline font-semibold hover:text-white ml-2">Dismiss</button>
+  </div>
+
+  <!-- Global Active SOS Warning Header (Appears when SOS is triggered) -->
+  <div id="global-sos-banner" class="hidden bg-gradient-to-r from-red-600 via-rose-600 to-red-600 text-white px-4 py-3 shadow-xl strobe-alert flex items-center justify-between border-b-2 border-white/30 z-40">
+    <div class="flex items-center space-x-3 max-w-7xl mx-auto w-full">
+      <span class="text-2xl animate-bounce">🚨</span>
+      <div class="flex-1">
+        <div class="font-extrabold text-sm md:text-base tracking-wide uppercase">
+          EMERGENCY SOS ACTIVE: CR Park, New Delhi!
+        </div>
+        <div class="text-xs text-red-100 flex flex-wrap gap-x-4">
+          <span>Patient: <strong>Subir Sharma (Age 71, Blood B+)</strong></span>
+          <span>Emergency Contacts: <strong>Rohan (Kolkata) - ALARMED</strong></span>
+          <span id="banner-ambulance-status">Hospital Status: <strong>Awaiting Ambulance Dispatch</strong></span>
+        </div>
+      </div>
+      <div class="flex items-center space-x-2">
+        <button onclick="dispatchAmbulanceAction()" id="banner-dispatch-btn" class="px-3 py-1.5 bg-white text-red-700 hover:bg-red-50 font-bold rounded-lg text-xs shadow-md">
+          🚑 Dispatch Ambulance
+        </button>
+        <button onclick="resolveSosAction()" class="px-3 py-1.5 bg-red-950/80 hover:bg-black text-white font-semibold rounded-lg text-xs border border-white/20">
+          Mark Resolved
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main View Container -->
+  <main class="flex-1 p-3 md:p-6 max-w-[1600px] w-full mx-auto">
+    
+    <!-- ============================================================== -->
+    <!-- VIEW CONTAINER (Dynamic based on selected mode) -->
+    <!-- ============================================================== -->
+    <div id="view-layout" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- ============================================================ -->
+      <!-- COLUMN 1: CAREGIVER PORTAL (Child in Kolkata) -->
+      <!-- ============================================================ -->
+      <section id="col-caregiver" class="bg-slate-900 border border-slate-800 rounded-2xl flex flex-col shadow-xl overflow-hidden">
+        
+        <!-- Header -->
+        <div class="bg-slate-950 px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <div class="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-lg border border-blue-500/30">
+              👦
+            </div>
+            <div>
+              <div class="flex items-center space-x-2">
+                <h2 class="font-bold text-slate-100">Caregiver Dashboard</h2>
+                <span class="text-xs px-2 py-0.5 bg-blue-500/10 text-blue-400 rounded-md border border-blue-500/20 font-semibold">Kolkata</span>
+              </div>
+              <p class="text-xs text-slate-400">Rohan Sharma (Monitoring Parents in Delhi)</p>
+            </div>
+          </div>
+          <span class="flex h-3 w-3 relative">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+          </span>
+        </div>
+
+        <div class="p-5 space-y-6 flex-1 overflow-y-auto max-h-[820px]">
+
+          <!-- Parents Telemetry Status Card -->
+          <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-4">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Parents Remote Health Link</span>
+              <span class="text-xs text-emerald-400 font-medium flex items-center space-x-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                <span>Phone Online (88% Bat)</span>
+              </span>
+            </div>
+            <div class="grid grid-cols-2 gap-3 text-xs">
+              <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                <div class="text-slate-400">Target Location</div>
+                <div class="font-semibold text-slate-200 mt-0.5">CR Park, New Delhi</div>
+                <div class="text-[11px] text-slate-500">~1,500 km away</div>
+              </div>
+              <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+                <div class="text-slate-400">Today's Adherence</div>
+                <div class="font-bold text-emerald-400 mt-0.5" id="adherence-stat">1 of 3 Taken</div>
+                <div class="text-[11px] text-slate-500">Next due at 02:00 PM</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- KILLER FEATURE #1: LIVE INSTANT ALARM TRIGGER -->
+          <div class="bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-950 border border-amber-600/40 rounded-xl p-4 shadow-lg">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center space-x-2">
+                <span class="text-amber-400 text-lg">⚡</span>
+                <h3 class="font-bold text-sm text-amber-200">Trigger Live Remote Alarm</h3>
+              </div>
+              <span class="text-[11px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-semibold">Immediate Ring</span>
+            </div>
+            <p class="text-xs text-slate-300 mb-3">
+              Send an audible high-volume siren to Delhi parents' phone instantly to remind them of osudh/medication.
+            </p>
+
+            <div class="space-y-2">
+              <div>
+                <label class="text-[11px] text-slate-400 font-medium">Select Target Medication:</label>
+                <select id="trigger-med-select" class="w-full mt-1 bg-slate-900 border border-slate-700 text-xs rounded-lg p-2 text-slate-200 focus:ring-1 focus:ring-amber-500 focus:outline-none">
+                  <!-- Populated by JS -->
+                </select>
+              </div>
+              <div>
+                <label class="text-[11px] text-slate-400 font-medium">Personalized Voice/Text Alert:</label>
+                <input id="trigger-message-input" type="text" value="Baba, dupur er osudh ta kheye nao please!" class="w-full mt-1 bg-slate-900 border border-slate-700 text-xs rounded-lg p-2 text-slate-200 focus:ring-1 focus:ring-amber-500 focus:outline-none" />
+              </div>
+              <button onclick="triggerRemoteAlarmFromCaregiver()" class="w-full mt-2 py-2.5 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-bold rounded-lg text-xs shadow-md transition-all flex items-center justify-center space-x-2 active:scale-95">
+                <span>🔔</span>
+                <span>Send Live Alarm to Delhi Phone</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Medication Schedule Management -->
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="font-bold text-sm text-slate-200 flex items-center space-x-1.5">
+                <span>💊</span>
+                <span>Scheduled Medications</span>
+              </h3>
+              <button onclick="openAddMedModal()" class="text-xs text-emerald-400 hover:text-emerald-300 font-semibold flex items-center space-x-1">
+                <span>+ Add Dose</span>
+              </button>
+            </div>
+
+            <!-- List of Meds -->
+            <div id="caregiver-meds-list" class="space-y-2.5">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- Live Activity Log -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Live Caregiver Audit Stream</span>
+              <span class="text-[11px] text-slate-500 font-mono">Sync: OK</span>
+            </div>
+            <div id="caregiver-audit-log" class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs font-mono space-y-2 max-h-48 overflow-y-auto">
+              <!-- Logs rendered here -->
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- COLUMN 2: PARENTS DEVICE (Elderly View - Delhi) -->
+      <!-- ============================================================ -->
+      <section id="col-parent" class="bg-slate-900 border border-slate-800 rounded-2xl flex flex-col shadow-xl overflow-hidden relative">
+        
+        <!-- Header -->
+        <div class="bg-slate-950 px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <div class="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-lg border border-emerald-500/30">
+              👴
+            </div>
+            <div>
+              <div class="flex items-center space-x-2">
+                <h2 class="font-bold text-slate-100">Parents Smartphone UI</h2>
+                <span class="text-xs px-2 py-0.5 bg-emerald-500/10 text-emerald-400 rounded-md border border-emerald-500/20 font-semibold">Delhi</span>
+              </div>
+              <p class="text-xs text-slate-400">Subir & Anjali Sharma (Senior Friendly UI)</p>
+            </div>
+          </div>
+          <button onclick="toggleLockScreen()" id="btn-lock-toggle" class="px-2.5 py-1 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 flex items-center space-x-1">
+            <span>🔒</span>
+            <span id="lock-toggle-text">Lock Phone</span>
+          </button>
+        </div>
+
+        <!-- Phone Shell Container -->
+        <div class="p-4 flex-1 flex flex-col bg-slate-950 relative overflow-hidden">
+          
+          <!-- MOBILE STATUS BAR SIMULATION -->
+          <div class="flex items-center justify-between text-[11px] text-slate-400 pb-3 px-2 border-b border-slate-900 font-mono">
+            <span id="phone-clock">02:15 PM</span>
+            <div class="flex items-center space-x-2">
+              <span>📶 5G Airtel</span>
+              <span>🔋 88%</span>
+            </div>
+          </div>
+
+          <!-- ======================================================== -->
+          <!-- LAYER A: ACTIVE RINGING ALARM OVERLAY (When child sends alert) -->
+          <!-- ======================================================== -->
+          <div id="parent-alarm-screen" class="hidden absolute inset-0 z-30 bg-slate-950/95 p-6 flex flex-col justify-between items-center text-center backdrop-blur-md">
+            
+            <div class="w-full flex justify-between items-center">
+              <span class="text-xs font-mono text-amber-400 bg-amber-500/20 border border-amber-500/30 px-3 py-1 rounded-full uppercase tracking-wider font-bold animate-pulse">
+                🔔 Urgent Medication Alarm
+              </span>
+              <span class="text-xs text-slate-400 font-mono" id="alarm-timer-display">Now</span>
+            </div>
+
+            <!-- Big Pulsing Visual Bell -->
+            <div class="my-auto space-y-4">
+              <div class="w-24 h-24 mx-auto rounded-full bg-gradient-to-tr from-amber-500 to-orange-400 flex items-center justify-center text-4xl shadow-2xl amber-alarm-pulse animate-bounce">
+                ⏰
+              </div>
+              <div>
+                <h3 class="text-2xl font-black text-white" id="alarm-modal-med-name">Metformin 500mg</h3>
+                <p class="text-amber-300 font-medium text-sm mt-1" id="alarm-modal-instruction">1 tablet immediately after lunch</p>
+              </div>
+
+              <!-- Message from son in Kolkata -->
+              <div class="bg-slate-900 border border-amber-500/30 p-3 rounded-xl max-w-xs mx-auto">
+                <div class="text-[11px] text-amber-400 font-semibold uppercase tracking-wider">Message from Rohan (Kolkata):</div>
+                <div class="text-xs text-slate-200 mt-1 italic" id="alarm-modal-custom-message">"Baba, dupur er osudh ta kheye nao please!"</div>
+              </div>
+            </div>
+
+            <!-- Huge Action Buttons for Senior Ease -->
+            <div class="w-full space-y-3 pb-4">
+              <button onclick="parentAcknowledgeAction('taken')" class="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-base rounded-2xl shadow-xl shadow-emerald-600/30 transition-all flex items-center justify-center space-x-2">
+                <span class="text-xl">✅</span>
+                <span>I HAVE TAKEN THE MEDICINE</span>
+              </button>
+              <button onclick="parentAcknowledgeAction('snooze')" class="w-full py-3 px-6 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 font-bold text-sm rounded-xl transition-all flex items-center justify-center space-x-2">
+                <span>⏰</span>
+                <span>Snooze (Remind in 10 mins)</span>
+              </button>
+            </div>
+
+          </div>
+
+          <!-- ======================================================== -->
+          <!-- LAYER B: SIMULATED LOCK SCREEN MODE (With Big Red SOS Button) -->
+          <!-- ======================================================== -->
+          <div id="parent-lock-screen" class="hidden absolute inset-0 z-20 bg-gradient-to-b from-slate-950 via-slate-900 to-black p-6 flex flex-col justify-between items-center text-center">
+            
+            <!-- Lock Screen Time & Date -->
+            <div class="pt-6 space-y-1">
+              <div class="text-slate-400 text-xs uppercase tracking-widest font-semibold">Delhi Home Phone • Locked</div>
+              <div class="text-5xl font-black text-white font-mono tracking-tight" id="lock-big-time">14:15</div>
+              <div class="text-xs text-slate-400 font-medium" id="lock-big-date">Tuesday, November 24</div>
+            </div>
+
+            <!-- KILLER FEATURE #2: THE LOCK SCREEN EMERGENCY SOS BUTTON -->
+            <div class="my-auto flex flex-col items-center">
+              <div class="relative group">
+                <!-- Glowing Outer Rings -->
+                <div class="absolute -inset-4 bg-red-600 rounded-full blur-xl opacity-75 group-hover:opacity-100 animate-ping-slow"></div>
+                <!-- SOS Physical Button -->
+                <button onclick="triggerEmergencySOS('lock_screen')" class="relative w-40 h-40 rounded-full bg-gradient-to-tr from-red-700 via-red-600 to-rose-500 active:scale-90 text-white font-black text-2xl shadow-2xl flex flex-col items-center justify-center border-4 border-red-300/40 transition-all">
+                  <span class="text-4xl mb-1">🚨</span>
+                  <span>SOS</span>
+                  <span class="text-[10px] tracking-wider uppercase font-semibold text-red-200 mt-1">1-Tap Emergency</span>
+                </button>
+              </div>
+              <p class="text-xs text-red-400/90 font-medium mt-4 max-w-[220px]">
+                Tap in an emergency to alert Nearest Hospital & Son in Kolkata!
+              </p>
+            </div>
+
+            <!-- Emergency Medical ID Card (Visible on Lock Screen) -->
+            <div class="w-full bg-slate-900/80 border border-red-500/30 rounded-xl p-3 text-left">
+              <div class="flex items-center justify-between text-xs pb-1 mb-2 border-b border-slate-800">
+                <span class="font-bold text-red-400 flex items-center space-x-1">
+                  <span>🪪</span>
+                  <span>Emergency Medical ID</span>
+                </span>
+                <span class="text-[11px] font-bold text-slate-300">Blood: <span class="text-red-400 font-extrabold">B+</span></span>
+              </div>
+              <div class="grid grid-cols-2 gap-2 text-[11px] text-slate-300">
+                <div>Conditions: <strong class="text-slate-100">Hypertension, Diabetes</strong></div>
+                <div>Allergies: <strong class="text-amber-400">Penicillin</strong></div>
+                <div class="col-span-2">Emergency Contact: <strong class="text-emerald-400">Rohan (Son) - +91 98300 98765</strong></div>
+              </div>
+            </div>
+
+            <!-- Swipe/Unlock Prompt -->
+            <div class="pt-2 text-xs text-slate-500 flex items-center space-x-1 cursor-pointer hover:text-slate-300" onclick="toggleLockScreen()">
+              <span>Swipe up to open regular app</span>
+              <span>↑</span>
+            </div>
+
+          </div>
+
+          <!-- ======================================================== -->
+          <!-- LAYER C: REGULAR UNLOCKED SENIOR APP VIEW -->
+          <!-- ======================================================== -->
+          <div id="parent-app-screen" class="space-y-4 pt-3 flex-1 flex flex-col justify-between overflow-y-auto">
+            
+            <!-- Greeting -->
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-lg font-bold text-slate-100">Shubho Bikel, Baba! 👋</h3>
+                <p class="text-xs text-slate-400">New Delhi • Medication Routine</p>
+              </div>
+              <span class="text-xs px-2.5 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full font-medium">
+                Protected by ElderGuard
+              </span>
+            </div>
+
+            <!-- Today's Schedule for Parents -->
+            <div class="space-y-2.5 flex-1">
+              <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Today's Osudh / Medicines</div>
+              <div id="parent-meds-cards" class="space-y-2.5">
+                <!-- Rendered dynamically -->
+              </div>
+            </div>
+
+            <!-- In-App Emergency Button -->
+            <div class="pt-4">
+              <button onclick="triggerEmergencySOS('in_app')" class="w-full py-3 px-4 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-extrabold text-sm rounded-xl shadow-lg flex items-center justify-center space-x-2 transition-all active:scale-95">
+                <span>🚨</span>
+                <span>ACTIVATE EMERGENCY SOS</span>
+              </button>
+              <p class="text-[11px] text-center text-slate-500 mt-1.5">
+                Rohan (Kolkata) & AIIMS Emergency Unit will be alerted instantly.
+              </p>
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ============================================================ -->
+      <!-- COLUMN 3: HOSPITAL & DISPATCH CENTER (AIIMS / Apollo Delhi) -->
+      <!-- ============================================================ -->
+      <section id="col-hospital" class="bg-slate-900 border border-slate-800 rounded-2xl flex flex-col shadow-xl overflow-hidden">
+        
+        <!-- Header -->
+        <div class="bg-slate-950 px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <div class="w-9 h-9 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center font-bold text-lg border border-red-500/30">
+              🏥
+            </div>
+            <div>
+              <div class="flex items-center space-x-2">
+                <h2 class="font-bold text-slate-100">Healthcare Emergency Desk</h2>
+                <span class="text-xs px-2 py-0.5 bg-red-500/10 text-red-400 rounded-md border border-red-500/20 font-semibold">AIIMS Trauma Node</span>
+              </div>
+              <p class="text-xs text-slate-400">CR Park & South Delhi Rapid Response Center</p>
+            </div>
+          </div>
+          <span id="hospital-badge-status" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            Monitoring
+          </span>
+        </div>
+
+        <div class="p-5 space-y-5 flex-1 overflow-y-auto max-h-[820px]">
+
+          <!-- Interactive GPS Map of Delhi Patient & Hospital -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-semibold text-slate-400 uppercase tracking-wider">Live Incident Geolocation</span>
+              <span class="text-slate-400 text-[11px] font-mono">28.5355° N, 77.2588° E</span>
+            </div>
+            <div id="hospital-map" class="h-56 w-full rounded-xl border border-slate-700 bg-slate-950 overflow-hidden relative z-0">
+              <!-- Leaflet loads here -->
+            </div>
+          </div>
+
+          <!-- Active Emergency Case / Dispatch Queue -->
+          <div id="hospital-sos-panel" class="bg-slate-950 border border-slate-800 rounded-xl p-4">
+            
+            <div id="hospital-no-sos" class="text-center py-6 text-slate-500 space-y-1">
+              <div class="text-2xl">🟢</div>
+              <div class="text-xs font-semibold text-slate-400">No Active Emergency Tickets</div>
+              <div class="text-[11px] text-slate-600">All registered elderly patients in normal status.</div>
+            </div>
+
+            <div id="hospital-active-sos" class="hidden space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-red-400 uppercase tracking-wider flex items-center space-x-1">
+                  <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                  <span>CRITICAL EMERGENCY CASE #9042</span>
+                </span>
+                <span class="text-[11px] font-mono bg-red-500/20 text-red-300 px-2 py-0.5 rounded border border-red-500/30 font-semibold" id="sos-timestamp">
+                  Just now
+                </span>
+              </div>
+
+              <!-- Patient Medical ID & Details -->
+              <div class="bg-slate-900 p-3 rounded-lg border border-slate-800 text-xs space-y-2">
+                <div class="flex justify-between">
+                  <span class="text-slate-400">Patient Name:</span>
+                  <strong class="text-slate-100">Subir Sharma (71 M)</strong>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-slate-400">Location:</span>
+                  <strong class="text-slate-100">B-42, CR Park, New Delhi</strong>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-slate-400">Blood Group:</span>
+                  <strong class="text-red-400 font-extrabold">B Rh-Positive (B+)</strong>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-slate-400">Known Conditions:</span>
+                  <span class="text-slate-300">Hypertension, Type-2 Diabetes</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-slate-400">Caregiver Alerted:</span>
+                  <span class="text-emerald-400 font-semibold">Rohan Sharma (Kolkata) - ACKNOWLEDGED</span>
+                </div>
+              </div>
+
+              <!-- Dispatch Action Block -->
+              <div id="ambulance-action-block" class="pt-1">
+                <button onclick="dispatchAmbulanceAction()" id="btn-dispatch-ambulance" class="w-full py-2.5 px-4 bg-red-600 hover:bg-red-500 text-white font-extrabold text-xs rounded-lg shadow-lg flex items-center justify-center space-x-2 transition-all">
+                  <span>🚑</span>
+                  <span>DISPATCH RAPID AMBULANCE UNIT</span>
+                </button>
+              </div>
+
+              <!-- Ambulance En Route Status (Hidden until dispatched) -->
+              <div id="ambulance-en-route-card" class="hidden bg-emerald-950/40 border border-emerald-500/30 rounded-lg p-3 text-xs space-y-2">
+                <div class="flex items-center justify-between text-emerald-400 font-bold">
+                  <span class="flex items-center space-x-1.5">
+                    <span class="animate-pulse">🚑</span>
+                    <span>Ambulance Unit 102 Dispatched!</span>
+                  </span>
+                  <span class="font-mono bg-emerald-500/20 px-2 py-0.5 rounded text-[11px]" id="ambulance-eta">ETA: 6 mins</span>
+                </div>
+                <div class="text-[11px] text-slate-300 flex justify-between">
+                  <span>Driver: <strong>Rajesh Kumar</strong></span>
+                  <span>Vehicle: <strong>DL-1T-4492</strong></span>
+                </div>
+                <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                  <div class="bg-emerald-500 h-1.5 rounded-full animate-pulse w-3/4"></div>
+                </div>
+              </div>
+
+              <!-- Resolve Button -->
+              <button onclick="resolveSosAction()" class="w-full py-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg text-xs transition-all">
+                Mark Incident Resolved & Dismiss
+              </button>
+
+            </div>
+
+          </div>
+
+          <!-- Hospital Rapid Response Stats -->
+          <div class="grid grid-cols-2 gap-3 text-xs">
+            <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+              <div class="text-slate-500 text-[11px]">Average Response Time</div>
+              <div class="text-lg font-bold text-slate-200 mt-0.5">6.8 mins</div>
+              <div class="text-[10px] text-emerald-400 font-medium">South Delhi Zone</div>
+            </div>
+            <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+              <div class="text-slate-500 text-[11px]">Primary Trauma Center</div>
+              <div class="text-sm font-bold text-slate-200 mt-1">AIIMS Trauma Node</div>
+              <div class="text-[10px] text-slate-400">CR Park Rapid Unit</div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- ============================================================== -->
+  <!-- MODAL: ADD MEDICATION SCHEDULE (Kolkata Caregiver) -->
+  <!-- ============================================================== -->
+  <div id="modal-add-med" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="font-bold text-white text-base flex items-center space-x-2">
+          <span>💊</span>
+          <span>Add Remote Medication Schedule</span>
+        </h3>
+        <button onclick="closeAddMedModal()" class="text-slate-400 hover:text-white text-lg font-bold">&times;</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="text-slate-400 font-semibold">Medicine Name & Dosage:</label>
+          <input id="new-med-name" type="text" placeholder="e.g. Amlodipine 5mg" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:ring-1 focus:ring-emerald-500 focus:outline-none" />
+        </div>
+        <div>
+          <label class="text-slate-400 font-semibold">Medical Condition / Purpose:</label>
+          <input id="new-med-condition" type="text" placeholder="e.g. Blood Pressure control" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:ring-1 focus:ring-emerald-500 focus:outline-none" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-slate-400 font-semibold">Scheduled Time:</label>
+            <input id="new-med-time" type="text" placeholder="e.g. 08:30 PM" value="08:30 PM" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:ring-1 focus:ring-emerald-500 focus:outline-none" />
+          </div>
+          <div>
+            <label class="text-slate-400 font-semibold">Instructions:</label>
+            <input id="new-med-instructions" type="text" placeholder="e.g. 1 tab after dinner" value="1 tab after dinner" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:ring-1 focus:ring-emerald-500 focus:outline-none" />
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end space-x-2 pt-2 border-t border-slate-800">
+        <button onclick="closeAddMedModal()" class="px-4 py-2 bg-slate-800 text-slate-300 font-semibold rounded-lg text-xs hover:bg-slate-700">Cancel</button>
+        <button onclick="submitNewMedication()" class="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg text-xs hover:bg-emerald-500 shadow-md">Schedule for Parents</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Audio Context & App Script -->
+  <script>
+    // Global Application State
+    let appState = {
+      parent: {},
+      caregiver: {},
+      medications: [],
+      activeAlarm: null,
+      activeSOS: null,
+      audit_logs: []
+    };
+
+    let isLockScreenActive = false;
+    let mapInstance = null;
+    let patientMarker = null;
+    let hospitalMarker = null;
+    let ambulanceMarker = null;
+    let audioCtx = null;
+    let sirenInterval = null;
+
+    // ==============================================================
+    // 1. SYNTHETIC AUDIO ENGINE (Web Audio API + SpeechSynthesis)
+    // ==============================================================
+    function initAudioContext() {
+      if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function playSyntheticTone(frequency, type, duration, gainValue = 0.2) {
+      try {
+        initAudioContext();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type || 'sine'; // sine, square, sawtooth
+        osc.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+
+        gain.gain.setValueAtTime(gainValue, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {
+        console.warn('Audio tone could not play:', e);
+      }
+    }
+
+    function startSirenSound(isEmergency = false) {
+      stopSirenSound();
+      initAudioContext();
+      let toggle = false;
+
+      // Pulse tones every 400ms
+      sirenInterval = setInterval(() => {
+        if (isEmergency) {
+          // Harsh emergency klaxon (750Hz <-> 1100Hz)
+          playSyntheticTone(toggle ? 1100 : 750, 'sawtooth', 0.35, 0.25);
+        } else {
+          // Melodic urgent medication alarm (520Hz <-> 880Hz)
+          playSyntheticTone(toggle ? 880 : 587, 'sine', 0.35, 0.22);
+        }
+        toggle = !toggle;
+      }, 400);
+    }
+
+    function stopSirenSound() {
+      if (sirenInterval) {
+        clearInterval(sirenInterval);
+        sirenInterval = null;
+      }
+    }
+
+    function speakAnnouncement(text) {
+      try {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.rate = 0.95;
+          utterance.pitch = 1.05;
+          window.speechSynthesis.speak(utterance);
+        }
+      } catch (err) {
+        console.warn('Speech synthesis error:', err);
+      }
+    }
+
+    function testAudioEngine() {
+      initAudioContext();
+      playSyntheticTone(880, 'sine', 0.4, 0.2);
+      speakAnnouncement("ElderGuard audio engine online. Ready for presentation.");
+    }
+
+    function dismissAudioNotice() {
+      initAudioContext();
+      document.getElementById('audio-notice').style.display = 'none';
+    }
+
+    // Auto unlock audio on any user interaction
+    window.addEventListener('click', () => {
+      initAudioContext();
+    }, { once: true });
+
+    // ==============================================================
+    // 2. SERVER COMMUNICATION & REALTIME SSE EVENT STREAM
+    // ==============================================================
+    async function fetchState() {
+      try {
+        const res = await fetch('/api/state');
+        const data = await res.json();
+        updateFullUI(data);
+      } catch (err) {
+        console.error('Failed to fetch initial state:', err);
+      }
+    }
+
+    function setupSSE() {
+      const connIndicator = document.getElementById('conn-indicator');
+      const connText = document.getElementById('conn-text');
+
+      const evtSource = new EventSource('/api/events');
+
+      evtSource.onopen = () => {
+        connIndicator.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse';
+        connText.textContent = 'Realtime Connected';
+      };
+
+      evtSource.onerror = (e) => {
+        connIndicator.className = 'w-2.5 h-2.5 rounded-full bg-amber-500';
+        connText.textContent = 'Reconnecting...';
+      };
+
+      evtSource.onmessage = (e) => {
+        try {
+          const payload = JSON.parse(e.data);
+          handleRealtimeEvent(payload);
+        } catch (err) {
+          // Heartbeat or comment
+        }
+      };
+    }
+
+    function handleRealtimeEvent(payload) {
+      const { type, data } = payload;
+      console.log('SSE Received:', type, data);
+
+      if (type === 'INIT_STATE' || type === 'STATE_UPDATED') {
+        updateFullUI(data);
+      } else if (type === 'ALARM_TRIGGERED') {
+        onAlarmTriggered(data);
+      } else if (type === 'ALARM_ACKNOWLEDGED') {
+        onAlarmAcknowledged(data);
+      } else if (type === 'SOS_TRIGGERED') {
+        onSosTriggered(data);
+      } else if (type === 'AMBULANCE_DISPATCHED') {
+        onAmbulanceDispatched(data);
+      } else if (type === 'SOS_RESOLVED') {
+        onSosResolved();
+      }
+    }
+
+    // ==============================================================
+    // 3. UI RENDERING & COMPONENT UPDATES
+    // ==============================================================
+    function updateFullUI(newState) {
+      appState = newState;
+
+      renderCaregiverView();
+      renderParentsView();
+      renderHospitalView();
+      renderSOSState();
+      renderAlarmState();
+    }
+
+    function renderCaregiverView() {
+      // Medication Select for Live Alert
+      const medSelect = document.getElementById('trigger-med-select');
+      medSelect.innerHTML = appState.medications.map(m => 
+        `<option value="${m.id}">${m.name} (${m.scheduledTime}) - ${m.condition}</option>`
+      ).join('');
+
+      // Caregiver Meds List
+      const listEl = document.getElementById('caregiver-meds-list');
+      listEl.innerHTML = appState.medications.map(m => {
+        let statusBadge = '';
+        if (m.status === 'taken') {
+          statusBadge = `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">✓ Taken (${m.lastAcknowledged || 'On Time'})</span>`;
+        } else if (m.status === 'ringing') {
+          statusBadge = `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse">🔔 Ringing Now</span>`;
+        } else if (m.status === 'snoozed') {
+          statusBadge = `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">⏰ Snoozed (10m)</span>`;
+        } else {
+          statusBadge = `<span class="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-800 text-slate-400 border border-slate-700">Scheduled</span>`;
+        }
+
+        return `
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80 hover:border-slate-700 transition-all flex items-center justify-between">
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="font-bold text-xs text-white">${m.name}</span>
+                <span class="text-[11px] font-mono text-emerald-400 font-semibold">${m.scheduledTime}</span>
+              </div>
+              <div class="text-[11px] text-slate-400 mt-0.5">${m.instructions}</div>
+            </div>
+            <div class="flex items-center space-x-2">
+              ${statusBadge}
+              <button onclick="deleteMedication('${m.id}')" class="text-slate-500 hover:text-red-400 text-xs px-1" title="Remove medication">&times;</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Adherence stats
+      const takenCount = appState.medications.filter(m => m.status === 'taken').length;
+      document.getElementById('adherence-stat').textContent = `${takenCount} of ${appState.medications.length} Taken`;
+
+      // Audit Logs
+      const logEl = document.getElementById('caregiver-audit-log');
+      logEl.innerHTML = appState.audit_logs.map(log => `
+        <div class="border-b border-slate-900 pb-1">
+          <span class="text-slate-500">[${log.timestamp}]</span>
+          <span class="${log.type === 'sos_alert' ? 'text-red-400 font-bold' : log.type === 'alarm_triggered' ? 'text-amber-400 font-semibold' : log.type === 'med_taken' ? 'text-emerald-400' : 'text-slate-300'}">
+            ${log.message}
+          </span>
+        </div>
+      `).join('');
+    }
+
+    function renderParentsView() {
+      const cardsEl = document.getElementById('parent-meds-cards');
+      cardsEl.innerHTML = appState.medications.map(m => {
+        const isTaken = m.status === 'taken';
+        return `
+          <div class="p-3.5 rounded-xl border ${isTaken ? 'bg-emerald-950/20 border-emerald-500/30' : 'bg-slate-900 border-slate-800'} flex items-center justify-between transition-all">
+            <div class="space-y-0.5">
+              <div class="flex items-center space-x-2">
+                <span class="font-bold text-sm text-white">${m.name}</span>
+                <span class="text-xs font-mono font-bold text-amber-400">${m.scheduledTime}</span>
+              </div>
+              <div class="text-xs text-slate-400">${m.instructions}</div>
+            </div>
+            <div>
+              ${isTaken ? 
+                `<span class="px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-bold">✓ Kheyechi</span>` :
+                `<button onclick="parentAcknowledgeSingleMed('${m.id}')" class="px-3 py-1.5 bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-300 text-xs font-bold rounded-lg border border-slate-700 transition-all">Mark Done</button>`
+              }
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderHospitalView() {
+      const noSosEl = document.getElementById('hospital-no-sos');
+      const activeSosEl = document.getElementById('hospital-active-sos');
+      const badgeStatus = document.getElementById('hospital-badge-status');
+
+      if (appState.activeSOS) {
+        noSosEl.classList.add('hidden');
+        activeSosEl.classList.remove('hidden');
+        badgeStatus.className = 'px-2.5 py-1 text-xs font-semibold rounded-lg bg-red-500/20 text-red-300 border border-red-500/30 animate-pulse';
+        badgeStatus.textContent = 'ACTIVE SOS EMERGENCY';
+
+        document.getElementById('sos-timestamp').textContent = appState.activeSOS.timestamp || 'Immediate';
+
+        const enRouteCard = document.getElementById('ambulance-en-route-card');
+        const actionBlock = document.getElementById('ambulance-action-block');
+
+        if (appState.activeSOS.status === 'AMBULANCE_DISPATCHED') {
+          enRouteCard.classList.remove('hidden');
+          actionBlock.classList.add('hidden');
+          document.getElementById('ambulance-eta').textContent = `ETA: ${appState.activeSOS.driver ? appState.activeSOS.driver.eta : '6 mins'}`;
+        } else {
+          enRouteCard.classList.add('hidden');
+          actionBlock.classList.remove('hidden');
+        }
+      } else {
+        noSosEl.classList.remove('hidden');
+        activeSosEl.classList.add('hidden');
+        badgeStatus.className = 'px-2.5 py-1 text-xs font-semibold rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+        badgeStatus.textContent = 'Monitoring Normal';
+      }
+    }
+
+    function renderSOSState() {
+      const banner = document.getElementById('global-sos-banner');
+      if (appState.activeSOS) {
+        banner.classList.remove('hidden');
+        const bannerAmbulance = document.getElementById('banner-ambulance-status');
+        const bannerBtn = document.getElementById('banner-dispatch-btn');
+        if (appState.activeSOS.status === 'AMBULANCE_DISPATCHED') {
+          bannerAmbulance.innerHTML = `Hospital Status: <strong class="text-emerald-300">Ambulance Unit Dispatched (${appState.activeSOS.driver?.eta || '6m'})</strong>`;
+          bannerBtn.classList.add('hidden');
+        } else {
+          bannerAmbulance.innerHTML = `Hospital Status: <strong>Awaiting Ambulance Dispatch</strong>`;
+          bannerBtn.classList.remove('hidden');
+        }
+      } else {
+        banner.classList.add('hidden');
+      }
+    }
+
+    function renderAlarmState() {
+      const alarmScreen = document.getElementById('parent-alarm-screen');
+      if (appState.activeAlarm) {
+        alarmScreen.classList.remove('hidden');
+        document.getElementById('alarm-modal-med-name').textContent = appState.activeAlarm.medicationName || 'Scheduled Dose';
+        document.getElementById('alarm-modal-custom-message').textContent = `"${appState.activeAlarm.message}"`;
+      } else {
+        alarmScreen.classList.add('hidden');
+      }
+    }
+
+    // ==============================================================
+    // 4. EVENT RESPONSES & AUDIO ALARMS
+    // ==============================================================
+    function onAlarmTriggered(alarm) {
+      console.log('Starting Alarm Siren for:', alarm);
+      startSirenSound(false);
+      speakAnnouncement(`Alert from son Rohan in Kolkata. Baba, medication time: ${alarm.medicationName}.`);
+    }
+
+    function onAlarmAcknowledged(ack) {
+      console.log('Alarm acknowledged:', ack);
+      stopSirenSound();
+      if (ack.action === 'taken') {
+        speakAnnouncement("Confirmation received. Medicine marked as taken.");
+      }
+    }
+
+    function onSosTriggered(sos) {
+      console.log('🚨 SOS TRIGGERED 🚨');
+      startSirenSound(true);
+      speakAnnouncement("Critical emergency SOS activated! Notifying nearest hospital and child in Kolkata!");
+      
+      // Update Map Marker
+      if (patientMarker) {
+        patientMarker.bindPopup(`<b>🚨 EMERGENCY INCIDENT</b><br>${sos.patientName}<br>Blood: B+`).openPopup();
+      }
+    }
+
+    function onAmbulanceDispatched(sos) {
+      console.log('Ambulance dispatched:', sos);
+      speakAnnouncement("Emergency desk has dispatched Rapid Ambulance Unit 102. Estimated arrival in 6 minutes.");
+    }
+
+    function onSosResolved() {
+      stopSirenSound();
+      speakAnnouncement("Emergency incident marked as resolved. Normal monitoring resumed.");
+    }
+
+    // ==============================================================
+    // 5. USER ACTIONS & API CALLS
+    // ==============================================================
+    async function triggerRemoteAlarmFromCaregiver() {
+      const medId = document.getElementById('trigger-med-select').value;
+      const message = document.getElementById('trigger-message-input').value;
+
+      try {
+        await fetch('/api/trigger-alarm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ medicationId: medId, message: message })
+        });
+      } catch (err) {
+        alert('Failed to send alarm: ' + err);
+      }
+    }
+
+    async function parentAcknowledgeAction(action) {
+      stopSirenSound();
+      try {
+        await fetch('/api/acknowledge-alarm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: action })
+        });
+      } catch (err) {
+        alert('Failed to acknowledge: ' + err);
+      }
+    }
+
+    async function parentAcknowledgeSingleMed(medId) {
+      try {
+        await fetch('/api/acknowledge-alarm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'taken', medicationId: medId })
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function triggerEmergencySOS(source) {
+      try {
+        await fetch('/api/trigger-sos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source: source })
+        });
+      } catch (err) {
+        alert('Failed to trigger SOS: ' + err);
+      }
+    }
+
+    async function dispatchAmbulanceAction() {
+      try {
+        await fetch('/api/dispatch-ambulance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ driverName: 'Rajesh Kumar (Unit 102)', vehicleNumber: 'DL-1T-4492', eta: '6 mins' })
+        });
+      } catch (err) {
+        alert('Dispatch error: ' + err);
+      }
+    }
+
+    async function resolveSosAction() {
+      stopSirenSound();
+      try {
+        await fetch('/api/resolve-sos', { method: 'POST' });
+      } catch (err) {
+        alert('Resolve error: ' + err);
+      }
+    }
+
+    async function submitNewMedication() {
+      const name = document.getElementById('new-med-name').value.trim();
+      const condition = document.getElementById('new-med-condition').value.trim();
+      const time = document.getElementById('new-med-time').value.trim();
+      const instructions = document.getElementById('new-med-instructions').value.trim();
+
+      if (!name) return alert('Please enter medicine name');
+
+      try {
+        await fetch('/api/medications', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, condition, scheduledTime: time, instructions })
+        });
+        closeAddMedModal();
+      } catch (err) {
+        alert('Failed to add: ' + err);
+      }
+    }
+
+    async function deleteMedication(id) {
+      if (!confirm('Remove this medication schedule?')) return;
+      try {
+        await fetch(`/api/medications/${id}`, { method: 'DELETE' });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function resetDemoState() {
+      stopSirenSound();
+      try {
+        await fetch('/api/reset-demo', { method: 'POST' });
+      } catch (err) {
+        alert('Reset failed: ' + err);
+      }
+    }
+
+    // ==============================================================
+    // 6. UI TOGGLES, MODALS & LEAFLET MAP
+    // ==============================================================
+    function toggleLockScreen() {
+      isLockScreenActive = !isLockScreenActive;
+      const lockScreen = document.getElementById('parent-lock-screen');
+      const toggleText = document.getElementById('lock-toggle-text');
+      
+      if (isLockScreenActive) {
+        lockScreen.classList.remove('hidden');
+        toggleText.textContent = 'Unlock Phone';
+      } else {
+        lockScreen.classList.add('hidden');
+        toggleText.textContent = 'Lock Phone';
+      }
+    }
+
+    function openAddMedModal() {
+      document.getElementById('modal-add-med').classList.remove('hidden');
+    }
+
+    function closeAddMedModal() {
+      document.getElementById('modal-add-med').classList.add('hidden');
+    }
+
+    function setViewMode(mode) {
+      const colCaregiver = document.getElementById('col-caregiver');
+      const colParent = document.getElementById('col-parent');
+      const colHospital = document.getElementById('col-hospital');
+      const layout = document.getElementById('view-layout');
+
+      // Update button styles
+      document.querySelectorAll('.view-btn').forEach(btn => {
+        btn.className = 'view-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-all';
+      });
+      document.getElementById(`btn-view-${mode}`).className = 'view-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-emerald-600 text-white shadow-sm';
+
+      if (mode === 'multi') {
+        layout.className = 'grid grid-cols-1 lg:grid-cols-3 gap-6';
+        colCaregiver.classList.remove('hidden');
+        colParent.classList.remove('hidden');
+        colHospital.classList.remove('hidden');
+      } else if (mode === 'caregiver') {
+        layout.className = 'grid grid-cols-1 max-w-2xl mx-auto';
+        colCaregiver.classList.remove('hidden');
+        colParent.classList.add('hidden');
+        colHospital.classList.add('hidden');
+      } else if (mode === 'parent') {
+        layout.className = 'grid grid-cols-1 max-w-md mx-auto';
+        colCaregiver.classList.add('hidden');
+        colParent.classList.remove('hidden');
+        colHospital.classList.add('hidden');
+      } else if (mode === 'hospital') {
+        layout.className = 'grid grid-cols-1 max-w-3xl mx-auto';
+        colCaregiver.classList.add('hidden');
+        colParent.classList.add('hidden');
+        colHospital.classList.remove('hidden');
+      }
+
+      // Invalidate Leaflet map size on layout change
+      if (mapInstance) {
+        setTimeout(() => mapInstance.invalidateSize(), 200);
+      }
+    }
+
+    function initMap() {
+      const parentLat = 28.5355;
+      const parentLng = 77.2588;
+
+      mapInstance = L.map('hospital-map', { zoomControl: false }).setView([parentLat, parentLng], 13);
+      L.control.zoom({ position: 'bottomright' }).addTo(mapInstance);
+
+      // OpenStreetMap Tiles (Dark/Midnight friendly carto)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(mapInstance);
+
+      // Patient Marker (CR Park)
+      patientMarker = L.circleMarker([parentLat, parentLng], {
+        radius: 9,
+        fillColor: '#ef4444',
+        color: '#ffffff',
+        weight: 2,
+        opacity: 1,
+        fillOpacity: 0.9
+      }).addTo(mapInstance);
+      patientMarker.bindPopup('<b>Subir Sharma (Home)</b><br>B-42, CR Park, New Delhi');
+
+      // AIIMS Hospital Marker
+      hospitalMarker = L.circleMarker([28.5672, 77.2100], {
+        radius: 9,
+        fillColor: '#3b82f6',
+        color: '#ffffff',
+        weight: 2,
+        opacity: 1,
+        fillOpacity: 0.9
+      }).addTo(mapInstance);
+      hospitalMarker.bindPopup('<b>AIIMS Emergency Trauma Node</b><br>Dispatch Station');
+    }
+
+    function updateLiveClocks() {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const fullDateStr = now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
+
+      const clockEl = document.getElementById('phone-clock');
+      const lockBigTime = document.getElementById('lock-big-time');
+      const lockBigDate = document.getElementById('lock-big-date');
+
+      if (clockEl) clockEl.textContent = timeStr;
+      if (lockBigTime) lockBigTime.textContent = timeStr;
+      if (lockBigDate) lockBigDate.textContent = fullDateStr;
+    }
+
+    // ==============================================================
+    // 7. INITIALIZATION
+    // ==============================================================
+    window.onload = () => {
+      fetchState();
+      setupSSE();
+      initMap();
+      updateLiveClocks();
+      setInterval(updateLiveClocks, 1000);
+    };
+  </script>
+</body>
+</html>
