@@ -1,1227 +1,1355 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ElderGuard - Remote Care & Emergency Live Alert System</title>
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Leaflet Map CSS & JS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <!-- Google Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-  
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
-            mono: ['"JetBrains Mono"', 'monospace'],
-          },
-          colors: {
-            brand: {
-              50: '#f0fdf4',
-              100: '#dcfce7',
-              500: '#22c55e',
-              600: '#16a34a',
-              700: '#15803d',
-            },
-            emergency: {
-              500: '#ef4444',
-              600: '#dc2626',
-              700: '#b91c1c',
-            }
-          },
-          animation: {
-            'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-            'ping-slow': 'ping 2s cubic-bezier(0, 0, 0.2, 1) infinite',
-          }
-        }
-      }
-    }
-  </script>
-
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#ffffff" />
+  <title>ElderGuard - Care Beyond Distance</title>
+  <link rel="manifest" href="/manifest.json" />
+  <!-- Tailwind is bundled locally so the UI still works offline or behind a blocked CDN. -->
+  <script src="/tailwind.js"></script>
   <style>
-    /* Custom scrollbar */
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: #f1f5f9; }
-    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
-    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    /* Safety net: even if the stylesheet engine fails, screens must still hide/show. */
+    .hidden { display: none !important; }
+  </style>
+  <style>
+    :root {
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --brand: #059669;
+      --brand-dark: #047857;
+      --teal: #0d9488;
+      --soft: #f8fafc;
+    }
+    html { font-size: 17px; scroll-behavior: smooth; }
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: #ffffff;
+      color: var(--ink);
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0 0 auto 0;
+      height: 340px;
+      background: radial-gradient(circle at 12% -10%, rgba(5,150,105,.10), transparent 42%),
+                  radial-gradient(circle at 88% 0%, rgba(13,148,136,.10), transparent 45%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    #auth-screen, #app-screen { position: relative; z-index: 1; }
 
-    /* Flashing red SOS effect */
-    @keyframes redStrobe {
-      0%, 100% { background-color: rgba(220, 38, 38, 0.95); }
-      50% { background-color: rgba(153, 27, 27, 0.98); }
+    .brand-mark {
+      background: linear-gradient(135deg, #059669, #0d9488);
+      box-shadow: 0 10px 24px rgba(5,150,105,.24);
     }
-    .strobe-alert {
-      animation: redStrobe 0.8s infinite;
+    .auth-card {
+      background: #fff;
+      border: 1px solid rgba(226,232,240,.9);
+      box-shadow: 0 24px 70px rgba(15,23,42,.10), 0 2px 10px rgba(15,23,42,.04);
+    }
+    .app-header {
+      background: rgba(255,255,255,.92);
+      box-shadow: 0 1px 0 rgba(226,232,240,.9), 0 8px 24px rgba(15,23,42,.035);
+    }
+    .header-icon {
+      width: 2.2rem; height: 2.2rem;
+      display: grid; place-items: center;
+      border-radius: .75rem;
+      border: 1px solid var(--line);
+      background: #fff;
+      transition: .18s ease;
+    }
+    .header-icon:hover { transform: translateY(-1px); border-color: #99f6e4; background: #f0fdfa; }
+    .header-account {
+      display: flex; align-items: center; gap: .5rem;
+      padding: .28rem .6rem .28rem .3rem;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #fff;
+      transition: .18s ease;
+    }
+    .header-account:hover { border-color: #a7f3d0; box-shadow: 0 6px 18px rgba(5,150,105,.10); }
+    .avatar {
+      width: 2rem; height: 2rem;
+      display: grid; place-items: center;
+      border-radius: 999px;
+      font-size: .78rem; font-weight: 800;
+      color: #047857; background: linear-gradient(135deg, #d1fae5, #ccfbf1);
+      border: 1px solid #a7f3d0;
+    }
+    .avatar-lg { width: 3.5rem; height: 3.5rem; font-size: 1.15rem; }
+
+    .hero-card {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid #d1fae5;
+      border-radius: 1.5rem;
+      background: linear-gradient(120deg, #ecfdf5 0%, #ffffff 48%, #f0fdfa 100%);
+      padding: 1.35rem 1.4rem;
+      box-shadow: 0 12px 34px rgba(5,150,105,.08);
+    }
+    .hero-card::after {
+      content: '';
+      position: absolute; right: -50px; top: -70px;
+      width: 220px; height: 220px; border-radius: 999px;
+      background: radial-gradient(circle, rgba(13,148,136,.14), transparent 65%);
+      pointer-events: none;
+    }
+    .eyebrow {
+      font-size: .68rem;
+      font-weight: 800;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: var(--brand-dark);
+    }
+    .hero-title { font-size: 1.45rem; font-weight: 850; letter-spacing: -.02em; line-height: 1.2; }
+    .hero-sub { font-size: .88rem; color: var(--muted); max-width: 42rem; }
+
+    .card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 1.15rem;
+      padding: 1.1rem;
+      box-shadow: 0 2px 5px rgba(15,23,42,.03), 0 14px 34px rgba(15,23,42,.035);
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    }
+    .card:hover { transform: translateY(-1px); box-shadow: 0 6px 12px rgba(15,23,42,.04), 0 20px 44px rgba(15,23,42,.05); }
+    .card-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .9rem; }
+    .card-head h2 { font-weight: 750; font-size: .98rem; letter-spacing: -.01em; }
+    .soft-card {
+      background: linear-gradient(180deg, #f8fafc, #ffffff);
+      border: 1px solid var(--line);
+      border-radius: .95rem;
+      padding: .85rem;
     }
 
-    /* Ringing amber alarm effect */
-    @keyframes amberPulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
-      50% { box-shadow: 0 0 30px 15px rgba(245, 158, 11, 0.3); }
+    .stat-card {
+      display: flex; align-items: center; gap: .8rem;
+      background: #fff; border: 1px solid var(--line);
+      border-radius: 1rem; padding: .85rem 1rem;
+      box-shadow: 0 8px 24px rgba(15,23,42,.035);
     }
-    .amber-alarm-pulse {
-      animation: amberPulse 1.5s infinite;
+    .stat-icon {
+      width: 2.5rem; height: 2.5rem; border-radius: .8rem;
+      display: grid; place-items: center; font-size: 1.1rem;
+      background: #ecfdf5; border: 1px solid #a7f3d0;
+    }
+    .stat-label { font-size: .7rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
+    .stat-value { font-size: 1.25rem; font-weight: 850; line-height: 1.1; }
+
+    .field {
+      width: 100%; background: #fff; border: 1px solid #cbd5e1;
+      border-radius: .65rem; padding: .62rem .78rem;
+      font-size: .88rem; color: var(--ink);
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+    .field:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px rgba(5,150,105,.13); }
+    .field-label { display: block; font-size: .7rem; font-weight: 750; color: var(--muted); margin-bottom: .3rem; text-transform: uppercase; letter-spacing: .05em; }
+
+    .pill { display: inline-flex; align-items: center; gap: .25rem; padding: .17rem .52rem; border-radius: .45rem; font-size: .72rem; font-weight: 750; }
+    .btn { padding: .52rem .85rem; border-radius: .65rem; font-weight: 750; font-size: .82rem; transition: .16s ease; }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary { background: linear-gradient(135deg, #059669, #0d9488); color: #fff; box-shadow: 0 8px 18px rgba(5,150,105,.18); }
+    .btn-secondary { background: #f1f5f9; color: #334155; border: 1px solid var(--line); }
+    .btn-danger { background: linear-gradient(135deg, #dc2626, #ef4444); color: #fff; box-shadow: 0 10px 24px rgba(239,68,68,.25); }
+    .btn-ghost { background: #fff; border: 1px solid var(--line); color: #475569; }
+
+    .progress-track { height: .5rem; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
+    .progress-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #059669, #14b8a6); transition: width .4s ease; }
+
+    .hold-ring { transition: transform 2s linear; transform: scale(1); }
+    .hold-ring.active { transform: scale(1.35); }
+    .sos-button {
+      background: radial-gradient(circle at 35% 30%, #fb7185, #dc2626 62%, #b91c1c);
+      box-shadow: 0 0 0 8px rgba(239,68,68,.10), 0 18px 44px rgba(220,38,38,.35);
+    }
+    .sos-button:hover { box-shadow: 0 0 0 12px rgba(239,68,68,.13), 0 22px 52px rgba(220,38,38,.40); }
+
+    .fade-in { animation: fade .18s ease-out; }
+    @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+    @keyframes toastIn { from { opacity: 0; transform: translateX(18px) scale(.97); } to { opacity: 1; transform: none; } }
+    .toast { animation: toastIn .22s ease-out; }
+
+    .panel {
+      background: #fff; border: 1px solid var(--line);
+      border-radius: 1.1rem; box-shadow: 0 24px 60px rgba(15,23,42,.14);
+    }
+    .notif-item { border-left: 3px solid transparent; transition: .16s ease; }
+    .notif-item.unread { border-left-color: #059669; background: #f0fdfa; }
+    .notif-item:hover { background: #f8fafc; }
+    @media (max-width: 640px) {
+      .hero-title { font-size: 1.25rem; }
+      .header-account span:last-child { display: none; }
     }
   </style>
 </head>
-<body class="bg-slate-900 text-slate-100 font-sans min-h-screen flex flex-col antialiased selection:bg-emerald-500 selection:text-white">
+<body class="min-h-screen bg-white text-slate-900 selection:bg-emerald-500/30">
 
-  <!-- Top Navigation & Presentation Bar -->
-  <header class="bg-slate-950/90 border-b border-slate-800 sticky top-0 z-50 backdrop-blur-md px-4 py-3">
-    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
-      
-      <!-- Brand & Tagline -->
-      <div class="flex items-center space-x-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white font-extrabold text-xl">
-          🛡️
+<!-- ===================== AUTH SCREEN ===================== -->
+<div id="auth-screen" class="min-h-screen flex items-center justify-center p-4">
+  <div class="auth-card w-full max-w-lg rounded-3xl p-6 sm:p-8">
+    <div class="flex items-center gap-3 mb-6">
+      <div class="brand-mark w-12 h-12 rounded-2xl grid place-items-center text-2xl">🛡️</div>
+      <div>
+        <h1 class="text-2xl font-extrabold tracking-tight">Elder<span class="text-emerald-600">Guard</span></h1>
+        <p class="text-sm text-slate-600">Care Beyond Distance.</p>
+      </div>
+    </div>
+
+    <div class="flex gap-2 mb-5 bg-white p-1 rounded-xl">
+      <button id="tab-login" onclick="setAuthTab('login')" class="flex-1 py-2 rounded-lg text-sm font-semibold bg-emerald-600 text-white">Sign in</button>
+      <button id="tab-register" onclick="setAuthTab('register')" class="flex-1 py-2 rounded-lg text-sm font-semibold text-slate-600">Create account</button>
+    </div>
+
+    <form id="auth-form" onsubmit="submitAuth(event)" class="space-y-3">
+      <div id="register-only" class="hidden space-y-3">
+        <div>
+          <label class="text-xs font-semibold text-slate-600">Your name</label>
+          <input name="name" class="field" placeholder="e.g. Anita Sharma" />
         </div>
         <div>
-          <div class="flex items-center space-x-2">
-            <h1 class="text-xl font-bold tracking-tight text-white">Elder<span class="text-emerald-400">Guard</span></h1>
-            <span class="px-2 py-0.5 text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full">Live Alert Sync</span>
-            <span class="px-2 py-0.5 text-xs font-semibold bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-full hidden sm:inline-block">Hackathon Demo</span>
+          <label class="text-xs font-semibold text-slate-600">I am a</label>
+          <select name="role" class="field" onchange="toggleProviderFields()">
+            <option value="patient">Patient / Elderly user</option>
+            <option value="caregiver">Family member / Caregiver</option>
+            <option value="provider">Healthcare provider (participating facility)</option>
+          </select>
+        </div>
+        <div id="provider-fields" class="hidden space-y-3">
+          <div>
+            <label class="text-xs font-semibold text-slate-600">Facility name</label>
+            <input name="facility_name" class="field" placeholder="Registered clinic / hospital desk" />
           </div>
-          <p class="text-xs text-slate-400">Remote Caregiver Medication Alarms & Emergency Lock-Screen SOS</p>
+          <div>
+            <label class="text-xs font-semibold text-slate-600">Facility address</label>
+            <input name="facility_address" class="field" placeholder="Street / area" />
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-slate-600">Facility city</label>
+            <input name="facility_city" class="field" placeholder="e.g. New Delhi" />
+          </div>
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-slate-600">City</label>
+          <input name="city" class="field" placeholder="e.g. New Delhi" />
         </div>
       </div>
 
-      <!-- Live Sync Status & View Switcher -->
-      <div class="flex items-center space-x-2 bg-slate-900 p-1.5 rounded-xl border border-slate-800">
-        <button onclick="setViewMode('multi')" id="btn-view-multi" class="view-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-emerald-600 text-white shadow-sm">
-          📺 Triple-Screen Presentation
-        </button>
-        <button onclick="setViewMode('caregiver')" id="btn-view-caregiver" class="view-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-all">
-          👦 Child Portal (Kolkata)
-        </button>
-        <button onclick="setViewMode('parent')" id="btn-view-parent" class="view-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-all">
-          👴 Parents Phone (Delhi)
-        </button>
-        <button onclick="setViewMode('hospital')" id="btn-view-hospital" class="view-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-all">
-          🏥 Hospital Dispatch
-        </button>
+      <div>
+        <label class="text-xs font-semibold text-slate-600">Email</label>
+        <input name="email" type="email" required class="field" placeholder="you@example.com" />
       </div>
-
-      <!-- Quick Action Controls for Hackathon Pitch -->
-      <div class="flex items-center space-x-2">
-        <button onclick="testAudioEngine()" class="px-2.5 py-1.5 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 flex items-center space-x-1.5" title="Test browser siren & speech synthesis">
-          <span>🔊</span> <span class="hidden md:inline">Test Audio</span>
-        </button>
-        <button onclick="resetDemoState()" class="px-2.5 py-1.5 text-xs font-medium bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/40 rounded-lg flex items-center space-x-1" title="Reset state for next demo round">
-          <span>🔄</span> <span>Reset Demo</span>
-        </button>
-        <div class="flex items-center space-x-1.5 pl-2 border-l border-slate-800 text-xs">
-          <span id="conn-indicator" class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span id="conn-text" class="text-slate-400 hidden lg:inline">Realtime Live</span>
+      <div>
+        <label class="text-xs font-semibold text-slate-600">Password</label>
+        <div class="relative">
+          <input id="password-input" name="password" type="password" required minlength="6" class="field pr-16" placeholder="At least 6 characters" />
+          <button type="button" onclick="togglePassword()" id="password-toggle" class="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-700 hover:text-emerald-800">Show</button>
         </div>
       </div>
+      <div id="register-phone" class="hidden">
+        <label class="text-xs font-semibold text-slate-600">Phone</label>
+        <input name="phone" class="field" placeholder="+91 ..." />
+      </div>
 
+      <p id="auth-error" class="text-sm text-rose-600 hidden"></p>
+      <button type="submit" id="auth-submit" class="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-bold">Sign in</button>
+    </form>
+
+  </div>
+</div>
+
+<!-- ===================== MAIN APP ===================== -->
+<div id="app-screen" class="hidden min-h-screen flex flex-col">
+  <header class="app-header sticky top-0 z-40 px-4 py-3">
+    <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="brand-mark w-9 h-9 rounded-xl grid place-items-center text-lg">🛡️</div>
+        <div>
+          <h1 class="font-extrabold leading-tight tracking-tight">Elder<span class="text-emerald-600">Guard</span></h1>
+          <p class="text-[11px] text-slate-500" id="header-subtitle">Care Beyond Distance</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <select id="patient-selector" onchange="selectPatient(this.value)" class="hidden bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm"></select>
+        <span id="role-badge" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 border border-slate-300"></span>
+        <span class="hidden sm:flex items-center gap-1.5 text-xs text-slate-600">
+          <span id="conn-dot" class="w-2 h-2 rounded-full bg-amber-400"></span>
+          <span id="conn-text">Connecting</span>
+        </span>
+        <button onclick="toggleNotifications()" class="header-icon relative" title="Notifications" aria-label="Notifications">
+          🔔<span id="notif-badge" class="hidden absolute -top-1 -right-1 min-w-[1.1rem] h-[1.1rem] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold grid place-items-center">0</span>
+        </button>
+        <button onclick="openProfileModal()" class="header-account" title="View profile">
+          <span id="header-avatar" class="avatar">EG</span>
+          <span id="header-name" class="text-xs font-bold text-slate-700">Account</span>
+        </button>
+        <button onclick="logout()" class="px-3 py-2 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200">Sign out</button>
+      </div>
     </div>
   </header>
 
-  <!-- Banner for Audio Enable (Required for browser autoplay policies) -->
-  <div id="audio-notice" class="bg-indigo-950/80 border-b border-indigo-800/50 px-4 py-2 text-center text-xs text-indigo-200 flex items-center justify-center space-x-2">
-    <span>💡 <strong>Audio Engine Initialized:</strong> Click anywhere on the page to enable synthetic alarm siren and voice announcements during live demo.</span>
-    <button onclick="dismissAudioNotice()" class="underline font-semibold hover:text-white ml-2">Dismiss</button>
-  </div>
-
-  <!-- Global Active SOS Warning Header (Appears when SOS is triggered) -->
-  <div id="global-sos-banner" class="hidden bg-gradient-to-r from-red-600 via-rose-600 to-red-600 text-white px-4 py-3 shadow-xl strobe-alert flex items-center justify-between border-b-2 border-white/30 z-40">
-    <div class="flex items-center space-x-3 max-w-7xl mx-auto w-full">
-      <span class="text-2xl animate-bounce">🚨</span>
-      <div class="flex-1">
-        <div class="font-extrabold text-sm md:text-base tracking-wide uppercase">
-          EMERGENCY SOS ACTIVE: CR Park, New Delhi!
-        </div>
-        <div class="text-xs text-red-100 flex flex-wrap gap-x-4">
-          <span>Patient: <strong>Subir Sharma (Age 71, Blood B+)</strong></span>
-          <span>Emergency Contacts: <strong>Rohan (Kolkata) - ALARMED</strong></span>
-          <span id="banner-ambulance-status">Hospital Status: <strong>Awaiting Ambulance Dispatch</strong></span>
-        </div>
-      </div>
-      <div class="flex items-center space-x-2">
-        <button onclick="dispatchAmbulanceAction()" id="banner-dispatch-btn" class="px-3 py-1.5 bg-white text-red-700 hover:bg-red-50 font-bold rounded-lg text-xs shadow-md">
-          🚑 Dispatch Ambulance
-        </button>
-        <button onclick="resolveSosAction()" class="px-3 py-1.5 bg-red-950/80 hover:bg-black text-white font-semibold rounded-lg text-xs border border-white/20">
-          Mark Resolved
-        </button>
+  <div id="notification-panel" class="hidden fixed right-3 top-20 z-50 w-[min(24rem,calc(100vw-1.5rem))] panel p-3">
+    <div class="flex items-center justify-between gap-2 mb-2">
+      <div><p class="font-bold">Notifications</p><p id="notif-subtitle" class="text-[11px] text-slate-500">You're up to date</p></div>
+      <div class="flex gap-2">
+        <button onclick="markAllRead()" class="text-[11px] text-emerald-700 font-bold">Mark all read</button>
+        <button onclick="toggleNotifications()" class="text-slate-500 text-lg leading-none">&times;</button>
       </div>
     </div>
+    <div id="notification-list" class="space-y-2 max-h-[60vh] overflow-y-auto"></div>
   </div>
 
-  <!-- Main View Container -->
-  <main class="flex-1 p-3 md:p-6 max-w-[1600px] w-full mx-auto">
-    
-    <!-- ============================================================== -->
-    <!-- VIEW CONTAINER (Dynamic based on selected mode) -->
-    <!-- ============================================================== -->
-    <div id="view-layout" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div id="honesty-banner" class="bg-indigo-50 border-b border-indigo-200 px-4 py-2 text-center text-xs text-indigo-800">
+    Alerts sound <strong>only while this page is open</strong>. Browsers cannot guarantee audio when closed or locked; reliable background alarms need a native app with FCM. SOS sends a <strong>request</strong> to contacts and participating facilities — this app does not dispatch ambulances.
+    <button onclick="document.getElementById('honesty-banner').classList.add('hidden')" class="ml-2 underline">Got it</button>
+  </div>
 
-      <!-- ============================================================ -->
-      <!-- COLUMN 1: CAREGIVER PORTAL (Child in Kolkata) -->
-      <!-- ============================================================ -->
-      <section id="col-caregiver" class="bg-slate-900 border border-slate-800 rounded-2xl flex flex-col shadow-xl overflow-hidden">
-        
-        <!-- Header -->
-        <div class="bg-slate-950 px-5 py-4 border-b border-slate-800 flex items-center justify-between">
-          <div class="flex items-center space-x-3">
-            <div class="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-lg border border-blue-500/30">
-              👦
-            </div>
-            <div>
-              <div class="flex items-center space-x-2">
-                <h2 class="font-bold text-slate-100">Caregiver Dashboard</h2>
-                <span class="text-xs px-2 py-0.5 bg-blue-500/10 text-blue-400 rounded-md border border-blue-500/20 font-semibold">Kolkata</span>
-              </div>
-              <p class="text-xs text-slate-400">Rohan Sharma (Monitoring Parents in Delhi)</p>
-            </div>
-          </div>
-          <span class="flex h-3 w-3 relative">
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-          </span>
-        </div>
-
-        <div class="p-5 space-y-6 flex-1 overflow-y-auto max-h-[820px]">
-
-          <!-- Parents Telemetry Status Card -->
-          <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-4">
-            <div class="flex items-center justify-between mb-3">
-              <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Parents Remote Health Link</span>
-              <span class="text-xs text-emerald-400 font-medium flex items-center space-x-1">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                <span>Phone Online (88% Bat)</span>
-              </span>
-            </div>
-            <div class="grid grid-cols-2 gap-3 text-xs">
-              <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
-                <div class="text-slate-400">Target Location</div>
-                <div class="font-semibold text-slate-200 mt-0.5">CR Park, New Delhi</div>
-                <div class="text-[11px] text-slate-500">~1,500 km away</div>
-              </div>
-              <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
-                <div class="text-slate-400">Today's Adherence</div>
-                <div class="font-bold text-emerald-400 mt-0.5" id="adherence-stat">1 of 3 Taken</div>
-                <div class="text-[11px] text-slate-500">Next due at 02:00 PM</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- KILLER FEATURE #1: LIVE INSTANT ALARM TRIGGER -->
-          <div class="bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-950 border border-amber-600/40 rounded-xl p-4 shadow-lg">
-            <div class="flex items-center justify-between mb-2">
-              <div class="flex items-center space-x-2">
-                <span class="text-amber-400 text-lg">⚡</span>
-                <h3 class="font-bold text-sm text-amber-200">Trigger Live Remote Alarm</h3>
-              </div>
-              <span class="text-[11px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-semibold">Immediate Ring</span>
-            </div>
-            <p class="text-xs text-slate-300 mb-3">
-              Send an audible high-volume siren to Delhi parents' phone instantly to remind them of osudh/medication.
-            </p>
-
-            <div class="space-y-2">
-              <div>
-                <label class="text-[11px] text-slate-400 font-medium">Select Target Medication:</label>
-                <select id="trigger-med-select" class="w-full mt-1 bg-slate-900 border border-slate-700 text-xs rounded-lg p-2 text-slate-200 focus:ring-1 focus:ring-amber-500 focus:outline-none">
-                  <!-- Populated by JS -->
-                </select>
-              </div>
-              <div>
-                <label class="text-[11px] text-slate-400 font-medium">Personalized Voice/Text Alert:</label>
-                <input id="trigger-message-input" type="text" value="Baba, dupur er osudh ta kheye nao please!" class="w-full mt-1 bg-slate-900 border border-slate-700 text-xs rounded-lg p-2 text-slate-200 focus:ring-1 focus:ring-amber-500 focus:outline-none" />
-              </div>
-              <button onclick="triggerRemoteAlarmFromCaregiver()" class="w-full mt-2 py-2.5 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-bold rounded-lg text-xs shadow-md transition-all flex items-center justify-center space-x-2 active:scale-95">
-                <span>🔔</span>
-                <span>Send Live Alarm to Delhi Phone</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Medication Schedule Management -->
+  <main class="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6">
+    <!-- CAREGIVER -->
+    <section id="view-caregiver" class="hidden space-y-5">
+      <div class="hero-card">
+        <div class="flex flex-wrap items-center justify-between gap-4 relative">
           <div>
-            <div class="flex items-center justify-between mb-3">
-              <h3 class="font-bold text-sm text-slate-200 flex items-center space-x-1.5">
-                <span>💊</span>
-                <span>Scheduled Medications</span>
-              </h3>
-              <button onclick="openAddMedModal()" class="text-xs text-emerald-400 hover:text-emerald-300 font-semibold flex items-center space-x-1">
-                <span>+ Add Dose</span>
-              </button>
-            </div>
-
-            <!-- List of Meds -->
-            <div id="caregiver-meds-list" class="space-y-2.5">
-              <!-- Rendered dynamically -->
-            </div>
+            <p class="eyebrow">Caregiver workspace</p>
+            <h2 id="caregiver-greeting" class="hero-title mt-1">Your care dashboard</h2>
+            <p class="hero-sub mt-1">Plan medicines, send instant family alerts, and watch emergency status in one calm place.</p>
           </div>
+          <button onclick="openProfileModal()" class="btn btn-ghost">👤 View profile</button>
+        </div>
+      </div>
+      <div class="grid sm:grid-cols-3 gap-4">
+        <div class="stat-card"><span class="stat-icon">💊</span><div><p class="stat-label">Medicines</p><p id="stat-meds" class="stat-value">0</p></div></div>
+        <div class="stat-card"><span class="stat-icon">👨‍👩‍👧</span><div><p class="stat-label">Active patients</p><p id="stat-patients" class="stat-value">0</p></div></div>
+        <div class="stat-card"><span class="stat-icon">🚨</span><div><p class="stat-label">Open emergencies</p><p id="stat-open-sos" class="stat-value">0</p></div></div>
+      </div>
+      <div class="grid md:grid-cols-2 gap-5">
+        <div class="card">
+          <div class="card-head"><h2>💊 Today's medicines</h2><button onclick="toggleAddMed()" class="text-emerald-600 text-sm font-semibold">+ Add</button></div>
+          <form id="add-med-form" onsubmit="addMedication(event)" class="hidden space-y-2 bg-white p-3 rounded-xl mb-3">
+            <input name="name" class="field" placeholder="Medicine name" required />
+            <div class="grid grid-cols-2 gap-2">
+              <input name="dose" class="field" placeholder="Dose, e.g. 500mg" />
+              <input name="schedule_time" type="time" class="field" value="09:00" required />
+            </div>
+            <input name="instructions" class="field" placeholder="Instructions" />
+            <button class="w-full py-2 rounded-lg bg-emerald-600 font-bold text-sm">Save schedule</button>
+          </form>
+          <div id="caregiver-meds" class="space-y-2"></div>
+        </div>
 
-          <!-- Live Activity Log -->
+        <div class="card">
+          <div class="card-head"><h2>⚡ Instant family alert</h2><span class="text-xs text-slate-500">One tap, sent now</span></div>
+          <div class="space-y-3">
+            <div id="alert-types" class="flex flex-wrap gap-2"></div>
+            <input id="alert-message" class="field" placeholder="Optional message" />
+            <button onclick="sendAlert()" class="w-full py-3 rounded-xl bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-300 hover:to-orange-300 text-slate-950 font-extrabold shadow-lg shadow-amber-200/60">Send alert</button>
+            <p class="text-[11px] text-slate-500">Delivery status is shown in activity. In-app delivery is instant while the patient's page is open.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-5">
+        <div class="card">
+          <div class="card-head"><h2>🚨 Emergency status</h2><button onclick="refresh()" class="text-xs text-slate-600">Refresh</button></div>
+          <div id="caregiver-sos" class="space-y-2"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>👨‍👩‍👧 Family connection</h2></div>
+          <p class="text-xs text-slate-600 mb-2">Ask the patient for their invite code, then enter it here.</p>
+          <div id="caregiver-family" class="space-y-2"></div>
+          <form id="family-request-form" onsubmit="requestFamily(event)" class="mt-3 flex gap-2">
+            <input name="code" class="field" placeholder="Enter patient's invite code" required />
+            <button class="btn bg-emerald-600 shrink-0">Request</button>
+          </form>
+          <p class="text-[11px] text-slate-500 mt-2">Access becomes active only after the patient approves your request.</p>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>👤 My profile</h2><button onclick="openProfileModal()" class="text-emerald-600 text-sm font-semibold">Open</button></div>
+          <div id="caregiver-profile-summary" class="text-sm space-y-2"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>📜 Recent activity</h2></div>
+        <div id="caregiver-activity" class="space-y-1 text-sm"></div>
+      </div>
+    </section>
+
+    <!-- PATIENT -->
+    <section id="view-patient" class="hidden space-y-5">
+      <div class="hero-card">
+        <div class="flex flex-wrap items-center justify-between gap-4 relative">
           <div>
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Live Caregiver Audit Stream</span>
-              <span class="text-[11px] text-slate-500 font-mono">Sync: OK</span>
-            </div>
-            <div id="caregiver-audit-log" class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs font-mono space-y-2 max-h-48 overflow-y-auto">
-              <!-- Logs rendered here -->
-            </div>
+            <p class="eyebrow">Patient home</p>
+            <h2 id="patient-greeting" class="hero-title mt-1">Good day</h2>
+            <p class="hero-sub mt-1">Your medicines, family messages and emergency help — all in one reassuring place.</p>
           </div>
-
+          <div class="w-full sm:w-64">
+            <div class="flex justify-between text-xs text-slate-600 mb-1"><span>Today's progress</span><span id="patient-adherence-text" class="font-bold text-emerald-700">0 / 0</span></div>
+            <div class="progress-track"><div id="patient-progress" class="progress-fill" style="width:0%"></div></div>
+          </div>
         </div>
-      </section>
-
-      <!-- ============================================================ -->
-      <!-- COLUMN 2: PARENTS DEVICE (Elderly View - Delhi) -->
-      <!-- ============================================================ -->
-      <section id="col-parent" class="bg-slate-900 border border-slate-800 rounded-2xl flex flex-col shadow-xl overflow-hidden relative">
-        
-        <!-- Header -->
-        <div class="bg-slate-950 px-5 py-4 border-b border-slate-800 flex items-center justify-between">
-          <div class="flex items-center space-x-3">
-            <div class="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-lg border border-emerald-500/30">
-              👴
-            </div>
-            <div>
-              <div class="flex items-center space-x-2">
-                <h2 class="font-bold text-slate-100">Parents Smartphone UI</h2>
-                <span class="text-xs px-2 py-0.5 bg-emerald-500/10 text-emerald-400 rounded-md border border-emerald-500/20 font-semibold">Delhi</span>
-              </div>
-              <p class="text-xs text-slate-400">Subir & Anjali Sharma (Senior Friendly UI)</p>
-            </div>
+      </div>
+      <div class="grid md:grid-cols-[1fr_320px] gap-5">
+        <div class="space-y-5">
+          <div class="card">
+            <div class="card-head"><h2>💊 My medicines today</h2><span id="adherence" class="text-sm text-emerald-600"></span></div>
+            <div id="patient-meds" class="space-y-3"></div>
           </div>
-          <button onclick="toggleLockScreen()" id="btn-lock-toggle" class="px-2.5 py-1 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 flex items-center space-x-1">
-            <span>🔒</span>
-            <span id="lock-toggle-text">Lock Phone</span>
-          </button>
+
+          <div class="card">
+            <div class="card-head"><h2>🔔 Messages from family</h2></div>
+            <div id="patient-alerts" class="space-y-2"></div>
+          </div>
         </div>
 
-        <!-- Phone Shell Container -->
-        <div class="p-4 flex-1 flex flex-col bg-slate-950 relative overflow-hidden">
-          
-          <!-- MOBILE STATUS BAR SIMULATION -->
-          <div class="flex items-center justify-between text-[11px] text-slate-400 pb-3 px-2 border-b border-slate-900 font-mono">
-            <span id="phone-clock">02:15 PM</span>
-            <div class="flex items-center space-x-2">
-              <span>📶 5G Airtel</span>
-              <span>🔋 88%</span>
-            </div>
+        <div class="space-y-5">
+          <div class="rounded-3xl border-4 border-red-500/60 bg-gradient-to-b from-red-50 to-white p-5 text-center shadow-2xl">
+            <p class="text-xs uppercase tracking-widest text-red-700 font-bold mb-3">Emergency</p>
+            <button id="sos-hold" class="sos-button relative w-44 h-44 mx-auto rounded-full active:scale-95 text-white font-black text-3xl select-none touch-none">
+              <span class="hold-ring absolute -inset-2 rounded-full border-4 border-red-300/70" id="sos-ring"></span>
+              <span class="relative">SOS</span>
+            </button>
+            <p id="sos-hint" class="text-xs text-red-700 mt-4">Press and hold for 2 seconds</p>
+            <p class="text-[11px] text-slate-600 mt-2">Shares your location with approved contacts and nearby participating facilities.</p>
           </div>
 
-          <!-- ======================================================== -->
-          <!-- LAYER A: ACTIVE RINGING ALARM OVERLAY (When child sends alert) -->
-          <!-- ======================================================== -->
-          <div id="parent-alarm-screen" class="hidden absolute inset-0 z-30 bg-slate-950/95 p-6 flex flex-col justify-between items-center text-center backdrop-blur-md">
-            
-            <div class="w-full flex justify-between items-center">
-              <span class="text-xs font-mono text-amber-400 bg-amber-500/20 border border-amber-500/30 px-3 py-1 rounded-full uppercase tracking-wider font-bold animate-pulse">
-                🔔 Urgent Medication Alarm
-              </span>
-              <span class="text-xs text-slate-400 font-mono" id="alarm-timer-display">Now</span>
-            </div>
-
-            <!-- Big Pulsing Visual Bell -->
-            <div class="my-auto space-y-4">
-              <div class="w-24 h-24 mx-auto rounded-full bg-gradient-to-tr from-amber-500 to-orange-400 flex items-center justify-center text-4xl shadow-2xl amber-alarm-pulse animate-bounce">
-                ⏰
-              </div>
-              <div>
-                <h3 class="text-2xl font-black text-white" id="alarm-modal-med-name">Metformin 500mg</h3>
-                <p class="text-amber-300 font-medium text-sm mt-1" id="alarm-modal-instruction">1 tablet immediately after lunch</p>
-              </div>
-
-              <!-- Message from son in Kolkata -->
-              <div class="bg-slate-900 border border-amber-500/30 p-3 rounded-xl max-w-xs mx-auto">
-                <div class="text-[11px] text-amber-400 font-semibold uppercase tracking-wider">Message from Rohan (Kolkata):</div>
-                <div class="text-xs text-slate-200 mt-1 italic" id="alarm-modal-custom-message">"Baba, dupur er osudh ta kheye nao please!"</div>
-              </div>
-            </div>
-
-            <!-- Huge Action Buttons for Senior Ease -->
-            <div class="w-full space-y-3 pb-4">
-              <button onclick="parentAcknowledgeAction('taken')" class="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-base rounded-2xl shadow-xl shadow-emerald-600/30 transition-all flex items-center justify-center space-x-2">
-                <span class="text-xl">✅</span>
-                <span>I HAVE TAKEN THE MEDICINE</span>
-              </button>
-              <button onclick="parentAcknowledgeAction('snooze')" class="w-full py-3 px-6 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-300 font-bold text-sm rounded-xl transition-all flex items-center justify-center space-x-2">
-                <span>⏰</span>
-                <span>Snooze (Remind in 10 mins)</span>
-              </button>
-            </div>
-
+          <div class="card">
+            <div class="card-head"><h2>👤 My profile</h2><button onclick="openProfileModal()" class="text-emerald-600 text-sm font-semibold">View / Edit</button></div>
+            <div id="patient-profile-summary" class="text-sm space-y-2"></div>
           </div>
 
-          <!-- ======================================================== -->
-          <!-- LAYER B: SIMULATED LOCK SCREEN MODE (With Big Red SOS Button) -->
-          <!-- ======================================================== -->
-          <div id="parent-lock-screen" class="hidden absolute inset-0 z-20 bg-gradient-to-b from-slate-950 via-slate-900 to-black p-6 flex flex-col justify-between items-center text-center">
-            
-            <!-- Lock Screen Time & Date -->
-            <div class="pt-6 space-y-1">
-              <div class="text-slate-400 text-xs uppercase tracking-widest font-semibold">Delhi Home Phone • Locked</div>
-              <div class="text-5xl font-black text-white font-mono tracking-tight" id="lock-big-time">14:15</div>
-              <div class="text-xs text-slate-400 font-medium" id="lock-big-date">Tuesday, November 24</div>
-            </div>
-
-            <!-- KILLER FEATURE #2: THE LOCK SCREEN EMERGENCY SOS BUTTON -->
-            <div class="my-auto flex flex-col items-center">
-              <div class="relative group">
-                <!-- Glowing Outer Rings -->
-                <div class="absolute -inset-4 bg-red-600 rounded-full blur-xl opacity-75 group-hover:opacity-100 animate-ping-slow"></div>
-                <!-- SOS Physical Button -->
-                <button onclick="triggerEmergencySOS('lock_screen')" class="relative w-40 h-40 rounded-full bg-gradient-to-tr from-red-700 via-red-600 to-rose-500 active:scale-90 text-white font-black text-2xl shadow-2xl flex flex-col items-center justify-center border-4 border-red-300/40 transition-all">
-                  <span class="text-4xl mb-1">🚨</span>
-                  <span>SOS</span>
-                  <span class="text-[10px] tracking-wider uppercase font-semibold text-red-200 mt-1">1-Tap Emergency</span>
-                </button>
-              </div>
-              <p class="text-xs text-red-400/90 font-medium mt-4 max-w-[220px]">
-                Tap in an emergency to alert Nearest Hospital & Son in Kolkata!
-              </p>
-            </div>
-
-            <!-- Emergency Medical ID Card (Visible on Lock Screen) -->
-            <div class="w-full bg-slate-900/80 border border-red-500/30 rounded-xl p-3 text-left">
-              <div class="flex items-center justify-between text-xs pb-1 mb-2 border-b border-slate-800">
-                <span class="font-bold text-red-400 flex items-center space-x-1">
-                  <span>🪪</span>
-                  <span>Emergency Medical ID</span>
-                </span>
-                <span class="text-[11px] font-bold text-slate-300">Blood: <span class="text-red-400 font-extrabold">B+</span></span>
-              </div>
-              <div class="grid grid-cols-2 gap-2 text-[11px] text-slate-300">
-                <div>Conditions: <strong class="text-slate-100">Hypertension, Diabetes</strong></div>
-                <div>Allergies: <strong class="text-amber-400">Penicillin</strong></div>
-                <div class="col-span-2">Emergency Contact: <strong class="text-emerald-400">Rohan (Son) - +91 98300 98765</strong></div>
-              </div>
-            </div>
-
-            <!-- Swipe/Unlock Prompt -->
-            <div class="pt-2 text-xs text-slate-500 flex items-center space-x-1 cursor-pointer hover:text-slate-300" onclick="toggleLockScreen()">
-              <span>Swipe up to open regular app</span>
-              <span>↑</span>
-            </div>
-
+          <div class="card">
+            <div class="card-head"><h2>🩺 Medical ID</h2><button onclick="toggleProfile()" class="text-emerald-600 text-sm font-semibold">Edit</button></div>
+            <form id="profile-form" onsubmit="saveProfile(event)" class="hidden space-y-2">
+              <input name="blood_group" class="field" placeholder="Blood group" />
+              <input name="allergies" class="field" placeholder="Allergies (comma separated)" />
+              <input name="conditions" class="field" placeholder="Conditions" />
+              <input name="doctor_name" class="field" placeholder="Doctor name" />
+              <input name="doctor_phone" class="field" placeholder="Doctor phone" />
+              <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="share_medical" class="w-4 h-4" /> Share medical info in an SOS</label>
+              <button class="w-full py-2 rounded-lg bg-emerald-600 font-bold text-sm">Save</button>
+            </form>
+            <div id="profile-view" class="text-sm space-y-1"></div>
           </div>
 
-          <!-- ======================================================== -->
-          <!-- LAYER C: REGULAR UNLOCKED SENIOR APP VIEW -->
-          <!-- ======================================================== -->
-          <div id="parent-app-screen" class="space-y-4 pt-3 flex-1 flex flex-col justify-between overflow-y-auto">
-            
-            <!-- Greeting -->
-            <div class="flex items-center justify-between">
-              <div>
-                <h3 class="text-lg font-bold text-slate-100">Shubho Bikel, Baba! 👋</h3>
-                <p class="text-xs text-slate-400">New Delhi • Medication Routine</p>
-              </div>
-              <span class="text-xs px-2.5 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full font-medium">
-                Protected by ElderGuard
-              </span>
-            </div>
-
-            <!-- Today's Schedule for Parents -->
-            <div class="space-y-2.5 flex-1">
-              <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Today's Osudh / Medicines</div>
-              <div id="parent-meds-cards" class="space-y-2.5">
-                <!-- Rendered dynamically -->
-              </div>
-            </div>
-
-            <!-- In-App Emergency Button -->
-            <div class="pt-4">
-              <button onclick="triggerEmergencySOS('in_app')" class="w-full py-3 px-4 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-extrabold text-sm rounded-xl shadow-lg flex items-center justify-center space-x-2 transition-all active:scale-95">
-                <span>🚨</span>
-                <span>ACTIVATE EMERGENCY SOS</span>
-              </button>
-              <p class="text-[11px] text-center text-slate-500 mt-1.5">
-                Rohan (Kolkata) & AIIMS Emergency Unit will be alerted instantly.
-              </p>
-            </div>
-
+          <div class="card">
+            <div class="card-head"><h2>📱 Emergency contacts</h2></div>
+            <div id="contacts-list" class="space-y-2 text-sm"></div>
+            <form id="contact-form" onsubmit="addContact(event)" class="mt-3 space-y-2">
+              <input name="name" class="field" placeholder="Contact name" required />
+              <input name="phone" class="field" placeholder="Phone number" required />
+              <input name="relation" class="field" placeholder="Relation" />
+              <button class="w-full py-2 rounded-lg bg-slate-200 hover:bg-slate-300 font-semibold text-sm">Add contact</button>
+            </form>
           </div>
 
+          <div class="card">
+            <div class="card-head"><h2>🔗 Family access</h2></div>
+            <button onclick="generateInvite()" class="w-full py-2 rounded-lg bg-slate-200 hover:bg-slate-300 font-semibold text-sm">Generate invite code</button>
+            <p id="invite-code" class="text-center font-mono text-lg text-emerald-600 mt-2"></p>
+            <p class="text-[11px] text-slate-500 mt-1">Share this code with your caregiver. When they enter it, their request will appear below for you to approve.</p>
+            <div id="family-requests" class="mt-3 space-y-2"></div>
+          </div>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <!-- ============================================================ -->
-      <!-- COLUMN 3: HOSPITAL & DISPATCH CENTER (AIIMS / Apollo Delhi) -->
-      <!-- ============================================================ -->
-      <section id="col-hospital" class="bg-slate-900 border border-slate-800 rounded-2xl flex flex-col shadow-xl overflow-hidden">
-        
-        <!-- Header -->
-        <div class="bg-slate-950 px-5 py-4 border-b border-slate-800 flex items-center justify-between">
-          <div class="flex items-center space-x-3">
-            <div class="w-9 h-9 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center font-bold text-lg border border-red-500/30">
-              🏥
-            </div>
-            <div>
-              <div class="flex items-center space-x-2">
-                <h2 class="font-bold text-slate-100">Healthcare Emergency Desk</h2>
-                <span class="text-xs px-2 py-0.5 bg-red-500/10 text-red-400 rounded-md border border-red-500/20 font-semibold">AIIMS Trauma Node</span>
-              </div>
-              <p class="text-xs text-slate-400">CR Park & South Delhi Rapid Response Center</p>
-            </div>
+    <!-- PROVIDER -->
+    <section id="view-provider" class="hidden space-y-5">
+      <div class="hero-card">
+        <div class="flex flex-wrap items-center justify-between gap-4 relative">
+          <div>
+            <p class="eyebrow">Provider workspace</p>
+            <h2 id="provider-greeting" class="hero-title mt-1">Facility request desk</h2>
+            <p class="hero-sub mt-1">Review SOS requests routed to your registered desk. Acknowledge or decline only — no dispatch is performed.</p>
           </div>
-          <span id="hospital-badge-status" class="px-2.5 py-1 text-xs font-semibold rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-            Monitoring
-          </span>
+          <button onclick="openProfileModal()" class="btn btn-ghost">👤 View profile</button>
         </div>
-
-        <div class="p-5 space-y-5 flex-1 overflow-y-auto max-h-[820px]">
-
-          <!-- Interactive GPS Map of Delhi Patient & Hospital -->
-          <div class="space-y-1.5">
-            <div class="flex items-center justify-between text-xs">
-              <span class="font-semibold text-slate-400 uppercase tracking-wider">Live Incident Geolocation</span>
-              <span class="text-slate-400 text-[11px] font-mono">28.5355° N, 77.2588° E</span>
-            </div>
-            <div id="hospital-map" class="h-56 w-full rounded-xl border border-slate-700 bg-slate-950 overflow-hidden relative z-0">
-              <!-- Leaflet loads here -->
-            </div>
-          </div>
-
-          <!-- Active Emergency Case / Dispatch Queue -->
-          <div id="hospital-sos-panel" class="bg-slate-950 border border-slate-800 rounded-xl p-4">
-            
-            <div id="hospital-no-sos" class="text-center py-6 text-slate-500 space-y-1">
-              <div class="text-2xl">🟢</div>
-              <div class="text-xs font-semibold text-slate-400">No Active Emergency Tickets</div>
-              <div class="text-[11px] text-slate-600">All registered elderly patients in normal status.</div>
-            </div>
-
-            <div id="hospital-active-sos" class="hidden space-y-3">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-red-400 uppercase tracking-wider flex items-center space-x-1">
-                  <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
-                  <span>CRITICAL EMERGENCY CASE #9042</span>
-                </span>
-                <span class="text-[11px] font-mono bg-red-500/20 text-red-300 px-2 py-0.5 rounded border border-red-500/30 font-semibold" id="sos-timestamp">
-                  Just now
-                </span>
-              </div>
-
-              <!-- Patient Medical ID & Details -->
-              <div class="bg-slate-900 p-3 rounded-lg border border-slate-800 text-xs space-y-2">
-                <div class="flex justify-between">
-                  <span class="text-slate-400">Patient Name:</span>
-                  <strong class="text-slate-100">Subir Sharma (71 M)</strong>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-slate-400">Location:</span>
-                  <strong class="text-slate-100">B-42, CR Park, New Delhi</strong>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-slate-400">Blood Group:</span>
-                  <strong class="text-red-400 font-extrabold">B Rh-Positive (B+)</strong>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-slate-400">Known Conditions:</span>
-                  <span class="text-slate-300">Hypertension, Type-2 Diabetes</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-slate-400">Caregiver Alerted:</span>
-                  <span class="text-emerald-400 font-semibold">Rohan Sharma (Kolkata) - ACKNOWLEDGED</span>
-                </div>
-              </div>
-
-              <!-- Dispatch Action Block -->
-              <div id="ambulance-action-block" class="pt-1">
-                <button onclick="dispatchAmbulanceAction()" id="btn-dispatch-ambulance" class="w-full py-2.5 px-4 bg-red-600 hover:bg-red-500 text-white font-extrabold text-xs rounded-lg shadow-lg flex items-center justify-center space-x-2 transition-all">
-                  <span>🚑</span>
-                  <span>DISPATCH RAPID AMBULANCE UNIT</span>
-                </button>
-              </div>
-
-              <!-- Ambulance En Route Status (Hidden until dispatched) -->
-              <div id="ambulance-en-route-card" class="hidden bg-emerald-950/40 border border-emerald-500/30 rounded-lg p-3 text-xs space-y-2">
-                <div class="flex items-center justify-between text-emerald-400 font-bold">
-                  <span class="flex items-center space-x-1.5">
-                    <span class="animate-pulse">🚑</span>
-                    <span>Ambulance Unit 102 Dispatched!</span>
-                  </span>
-                  <span class="font-mono bg-emerald-500/20 px-2 py-0.5 rounded text-[11px]" id="ambulance-eta">ETA: 6 mins</span>
-                </div>
-                <div class="text-[11px] text-slate-300 flex justify-between">
-                  <span>Driver: <strong>Rajesh Kumar</strong></span>
-                  <span>Vehicle: <strong>DL-1T-4492</strong></span>
-                </div>
-                <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                  <div class="bg-emerald-500 h-1.5 rounded-full animate-pulse w-3/4"></div>
-                </div>
-              </div>
-
-              <!-- Resolve Button -->
-              <button onclick="resolveSosAction()" class="w-full py-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg text-xs transition-all">
-                Mark Incident Resolved & Dismiss
-              </button>
-
-            </div>
-
-          </div>
-
-          <!-- Hospital Rapid Response Stats -->
-          <div class="grid grid-cols-2 gap-3 text-xs">
-            <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
-              <div class="text-slate-500 text-[11px]">Average Response Time</div>
-              <div class="text-lg font-bold text-slate-200 mt-0.5">6.8 mins</div>
-              <div class="text-[10px] text-emerald-400 font-medium">South Delhi Zone</div>
-            </div>
-            <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
-              <div class="text-slate-500 text-[11px]">Primary Trauma Center</div>
-              <div class="text-sm font-bold text-slate-200 mt-1">AIIMS Trauma Node</div>
-              <div class="text-[10px] text-slate-400">CR Park Rapid Unit</div>
-            </div>
-          </div>
-
+      </div>
+      <div class="grid sm:grid-cols-3 gap-4">
+        <div class="stat-card"><span class="stat-icon">🚨</span><div><p class="stat-label">Open requests</p><p id="provider-stat-open" class="stat-value">0</p></div></div>
+        <div class="stat-card"><span class="stat-icon">✅</span><div><p class="stat-label">Acknowledged</p><p id="provider-stat-ack" class="stat-value">0</p></div></div>
+        <div class="stat-card"><span class="stat-icon">📨</span><div><p class="stat-label">Total requests</p><p id="provider-stat-total" class="stat-value">0</p></div></div>
+      </div>
+      <div class="grid md:grid-cols-[1fr_300px] gap-5">
+      <div class="card">
+        <div class="card-head"><h2>🏥 Your facility request desk</h2><button onclick="refresh()" class="text-xs text-slate-600">Refresh</button></div>
+        <div id="provider-facility" class="text-sm text-slate-600"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>👤 My profile</h2><button onclick="openProfileModal()" class="text-emerald-600 text-sm font-semibold">Open</button></div>
+        <div id="provider-profile-summary" class="text-sm space-y-2"></div>
+      </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2>Incoming emergency requests</h2>
+          <span id="provider-count" class="pill bg-slate-100 border border-slate-300 text-slate-700">0 requests</span>
         </div>
-      </section>
-
-    </div>
+        <p class="text-xs text-amber-700 mb-3">Requests are recorded here for your desk to acknowledge or decline. This never dispatches an ambulance or medical service.</p>
+        <div id="provider-requests" class="space-y-3"></div>
+      </div>
+    </section>
   </main>
+</div>
 
-  <!-- ============================================================== -->
-  <!-- MODAL: ADD MEDICATION SCHEDULE (Kolkata Caregiver) -->
-  <!-- ============================================================== -->
-  <div id="modal-add-med" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl">
-      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-        <h3 class="font-bold text-white text-base flex items-center space-x-2">
-          <span>💊</span>
-          <span>Add Remote Medication Schedule</span>
-        </h3>
-        <button onclick="closeAddMedModal()" class="text-slate-400 hover:text-white text-lg font-bold">&times;</button>
-      </div>
+<!-- SOS DETAIL MODAL -->
+<div id="sos-modal" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur p-4 flex items-center justify-center">
+  <div class="bg-white border border-slate-300 rounded-2xl w-full max-w-lg p-5 space-y-3">
+    <div class="flex justify-between items-start">
+      <h3 class="text-lg font-bold text-red-600">🚨 Emergency request</h3>
+      <button onclick="closeSosModal()" class="text-slate-600 text-xl">&times;</button>
+    </div>
+    <div id="sos-modal-body" class="space-y-2 text-sm"></div>
+    <p class="text-xs text-slate-500 border-t border-slate-200 pt-3">This screen reports delivery and acknowledgement only. It never confirms an ambulance or medical dispatch.</p>
+  </div>
+</div>
 
-      <div class="space-y-3 text-xs">
+<!-- ACCOUNT PROFILE MODAL -->
+<div id="profile-modal" class="hidden fixed inset-0 z-50 bg-slate-900/40 backdrop-blur p-4 flex items-center justify-center">
+  <div class="panel w-full max-w-xl p-5 space-y-4">
+    <div class="flex justify-between items-start gap-3">
+      <div class="flex items-center gap-3">
+        <span id="profile-modal-avatar" class="avatar avatar-lg">EG</span>
         <div>
-          <label class="text-slate-400 font-semibold">Medicine Name & Dosage:</label>
-          <input id="new-med-name" type="text" placeholder="e.g. Amlodipine 5mg" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:ring-1 focus:ring-emerald-500 focus:outline-none" />
-        </div>
-        <div>
-          <label class="text-slate-400 font-semibold">Medical Condition / Purpose:</label>
-          <input id="new-med-condition" type="text" placeholder="e.g. Blood Pressure control" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:ring-1 focus:ring-emerald-500 focus:outline-none" />
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="text-slate-400 font-semibold">Scheduled Time:</label>
-            <input id="new-med-time" type="text" placeholder="e.g. 08:30 PM" value="08:30 PM" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:ring-1 focus:ring-emerald-500 focus:outline-none" />
-          </div>
-          <div>
-            <label class="text-slate-400 font-semibold">Instructions:</label>
-            <input id="new-med-instructions" type="text" placeholder="e.g. 1 tab after dinner" value="1 tab after dinner" class="w-full mt-1 bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-white focus:ring-1 focus:ring-emerald-500 focus:outline-none" />
-          </div>
+          <h3 class="text-lg font-extrabold tracking-tight" id="profile-modal-title">My profile</h3>
+          <p class="text-xs text-slate-500" id="profile-modal-subtitle">Account details</p>
         </div>
       </div>
-
-      <div class="flex justify-end space-x-2 pt-2 border-t border-slate-800">
-        <button onclick="closeAddMedModal()" class="px-4 py-2 bg-slate-800 text-slate-300 font-semibold rounded-lg text-xs hover:bg-slate-700">Cancel</button>
-        <button onclick="submitNewMedication()" class="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg text-xs hover:bg-emerald-500 shadow-md">Schedule for Parents</button>
+      <button onclick="closeProfileModal()" class="text-slate-500 text-2xl leading-none">&times;</button>
+    </div>
+    <div id="profile-view-box" class="space-y-3"></div>
+    <form id="account-profile-form" onsubmit="saveAccountProfile(event)" class="hidden space-y-3">
+      <div><label class="field-label">Full name</label><input name="name" class="field" required /></div>
+      <div class="grid sm:grid-cols-2 gap-3">
+        <div><label class="field-label">Phone</label><input name="phone" class="field" required /></div>
+        <div><label class="field-label">City</label><input name="city" class="field" /></div>
       </div>
+      <p class="text-[11px] text-slate-500">Email and role are fixed after signup. Contact an administrator if they need changing.</p>
+      <div class="flex gap-2">
+        <button class="btn btn-primary flex-1">Save changes</button>
+        <button type="button" onclick="toggleProfileEdit(false)" class="btn btn-secondary">Cancel</button>
+      </div>
+    </form>
+    <div id="profile-modal-actions" class="flex gap-2 border-t border-slate-200 pt-3">
+      <button onclick="toggleProfileEdit(true)" class="btn btn-primary flex-1">Edit profile</button>
+      <button onclick="closeProfileModal()" class="btn btn-secondary">Close</button>
     </div>
   </div>
+</div>
 
-  <!-- Audio Context & App Script -->
-  <script>
-    // Global Application State
-    let appState = {
-      parent: {},
-      caregiver: {},
-      medications: [],
-      activeAlarm: null,
-      activeSOS: null,
-      audit_logs: []
-    };
+<div id="toast-stack" class="fixed top-20 right-3 z-[60] w-[min(22rem,calc(100vw-1.5rem))] space-y-2"></div>
 
-    let isLockScreenActive = false;
-    let mapInstance = null;
-    let patientMarker = null;
-    let hospitalMarker = null;
-    let ambulanceMarker = null;
-    let audioCtx = null;
-    let sirenInterval = null;
+<script>
+const ALERT_TYPES = {
+  medicine: '💊 Take Your Medicine',
+  check_phone: '📱 Please Check Your Phone',
+  health_checkin: '❤️ Health Check-In',
+  emergency_call: '🚨 Contact Me Immediately',
+  custom: '✉️ Custom Alert'
+};
 
-    // ==============================================================
-    // 1. SYNTHETIC AUDIO ENGINE (Web Audio API + SpeechSynthesis)
-    // ==============================================================
-    function initAudioContext() {
-      if (!audioCtx) {
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        audioCtx = new AudioContext();
-      }
-      if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-      }
-    }
+let state = {
+  user: null,
+  patients: [],
+  selectedPatientId: null,
+  meds: [],
+  alerts: [],
+  sos: [],
+  activity: [],
+  profile: null,
+  contacts: [],
+  requests: [],
+  providerRequests: [],
+  providerFacility: null,
+  providerCounts: { open: 0, acknowledged: 0, total: 0 },
+  notifications: [],
+  unread: 0,
+  accountProfile: null,
+  profileEditing: false,
+  alertType: 'medicine',
+  audioCtx: null,
+  siren: null,
+  sirenStopTimer: null,
+  sosHoldTimer: null
+};
 
-    function playSyntheticTone(frequency, type, duration, gainValue = 0.2) {
-      try {
-        initAudioContext();
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = type || 'sine'; // sine, square, sawtooth
-        osc.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+const $ = id => document.getElementById(id);
+const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = iso => { try { return new Date(iso).toLocaleString([], {dateStyle:'medium', timeStyle:'short'}); } catch { return iso || ''; } };
+const initials = name => String(name || 'EG').trim().split(/\s+/).slice(0,2).map(w => w[0] || '').join('').toUpperCase() || 'EG';
+const greeting = () => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; };
+const timeAgo = iso => {
+  try {
+    const secs = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+    if (secs < 60) return 'just now';
+    if (secs < 3600) return `${Math.floor(secs/60)}m ago`;
+    if (secs < 86400) return `${Math.floor(secs/3600)}h ago`;
+    return `${Math.floor(secs/86400)}d ago`;
+  } catch { return ''; }
+};
+const locationHtml = s => {
+  if (s.lat === null || s.lat === undefined || s.lng === null || s.lng === undefined) {
+    return `<span class="text-slate-500">Location not shared (${esc(s.location_source)})</span>`;
+  }
+  const lat = Number(s.lat).toFixed(5), lng = Number(s.lng).toFixed(5);
+  return `${lat}, ${lng} (${esc(s.location_source)}) · <a class="text-emerald-600 underline" target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat=${s.lat}&mlon=${s.lng}#map=17/${s.lat}/${s.lng}">Open map</a>`;
+};
 
-        gain.gain.setValueAtTime(gainValue, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+const patientIdentityHtml = s => `
+  <p><span class="text-slate-600">Patient:</span> <strong>${esc(s.patient_name || 'Unknown')}</strong></p>
+  <p><span class="text-slate-600">Phone:</span> <strong>${esc(s.patient_phone || 'Not shared')}</strong> · <span class="text-slate-600">City:</span> <strong>${esc(s.patient_city || 'Not shared')}</strong></p>`;
 
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
+const medicalHtml = s => {
+  const m = s.medical;
+  if (!m || !m.share_medical) {
+    return '<p class="text-[11px] text-slate-500">Medical details are not shared by the patient. Ask the patient to enable “Share in SOS” in Medical ID.</p>';
+  }
+  return `
+    <p><span class="text-slate-600">Blood group:</span> <strong>${esc(m.blood_group || 'Not set')}</strong></p>
+    <p><span class="text-slate-600">Allergies:</span> <strong>${esc(m.allergies || 'None recorded')}</strong></p>
+    <p><span class="text-slate-600">Conditions:</span> <strong>${esc(m.conditions || 'None recorded')}</strong></p>
+    <p><span class="text-slate-600">Doctor:</span> <strong>${esc(m.doctor_name || 'Not set')}</strong> ${esc(m.doctor_phone)}</p>`;
+};
 
-        osc.start();
-        osc.stop(audioCtx.currentTime + duration);
-      } catch (e) {
-        console.warn('Audio tone could not play:', e);
-      }
-    }
+async function api(path, options = {}) {
+  const config = { credentials: 'same-origin', headers: {}, ...options };
+  if (config.body && !(config.body instanceof FormData)) {
+    config.headers['Content-Type'] = 'application/json';
+    config.body = JSON.stringify(config.body);
+  }
+  const res = await fetch(path, config);
+  let data = {};
+  try { data = await res.json(); } catch {}
+  if (!res.ok || data.success === false) throw new Error(data.error || `Request failed (${res.status})`);
+  return data;
+}
 
-    function startSirenSound(isEmergency = false) {
-      stopSirenSound();
-      initAudioContext();
-      let toggle = false;
+// Optional endpoints (for example on an older server) must not break the whole dashboard.
+async function apiOptional(path) {
+  try { return await api(path); } catch (err) {
+    console.warn('Optional endpoint unavailable:', path, err.message);
+    return null;
+  }
+}
 
-      // Pulse tones every 400ms
-      sirenInterval = setInterval(() => {
-        if (isEmergency) {
-          // Harsh emergency klaxon (750Hz <-> 1100Hz)
-          playSyntheticTone(toggle ? 1100 : 750, 'sawtooth', 0.35, 0.25);
-        } else {
-          // Melodic urgent medication alarm (520Hz <-> 880Hz)
-          playSyntheticTone(toggle ? 880 : 587, 'sine', 0.35, 0.22);
-        }
-        toggle = !toggle;
-      }, 400);
-    }
+function setAuthTab(tab) {
+  const registering = tab === 'register';
+  $('tab-login').className = 'flex-1 py-2 rounded-lg text-sm font-semibold ' + (registering ? 'text-slate-600' : 'bg-emerald-600 text-white');
+  $('tab-register').className = 'flex-1 py-2 rounded-lg text-sm font-semibold ' + (registering ? 'bg-emerald-600 text-white' : 'text-slate-600');
+  $('register-only').classList.toggle('hidden', !registering);
+  $('register-phone').classList.toggle('hidden', !registering);
+  $('auth-submit').textContent = registering ? 'Create account' : 'Sign in';
+}
 
-    function stopSirenSound() {
-      if (sirenInterval) {
-        clearInterval(sirenInterval);
-        sirenInterval = null;
-      }
-    }
+function toggleProviderFields() {
+  const role = document.querySelector('[name=role]').value;
+  $('provider-fields').classList.toggle('hidden', role !== 'provider');
+}
 
-    function speakAnnouncement(text) {
-      try {
-        if ('speechSynthesis' in window) {
-          window.speechSynthesis.cancel();
-          const utterance = new SpeechSynthesisUtterance(text);
-          utterance.rate = 0.95;
-          utterance.pitch = 1.05;
-          window.speechSynthesis.speak(utterance);
-        }
-      } catch (err) {
-        console.warn('Speech synthesis error:', err);
-      }
-    }
+async function submitAuth(event) {
+  event.preventDefault();
+  const form = event.target;
+  const registering = !$('register-only').classList.contains('hidden');
+  const data = Object.fromEntries(new FormData(form).entries());
+  if (!registering) { delete data.name; delete data.role; }
+  $('auth-error').classList.add('hidden');
+  try {
+    const res = await api(registering ? '/api/auth/register' : '/api/auth/login', { method:'POST', body:data });
+    state.user = res.user;
+    await enterApp();
+  } catch (err) {
+    $('auth-error').textContent = err.message;
+    $('auth-error').classList.remove('hidden');
+  }
+}
 
-    function testAudioEngine() {
-      initAudioContext();
-      playSyntheticTone(880, 'sine', 0.4, 0.2);
-      speakAnnouncement("ElderGuard audio engine online. Ready for presentation.");
-    }
+function togglePassword() {
+  const input = $('password-input');
+  const button = $('password-toggle');
+  const isShown = input.type === 'text';
+  input.type = isShown ? 'password' : 'text';
+  button.textContent = isShown ? 'Show' : 'Hide';
+}
 
-    function dismissAudioNotice() {
-      initAudioContext();
-      document.getElementById('audio-notice').style.display = 'none';
-    }
+async function logout() {
+  await api('/api/auth/logout', { method:'POST' });
+  state.user = null;
+  $('app-screen').classList.add('hidden');
+  $('auth-screen').classList.remove('hidden');
+}
 
-    // Auto unlock audio on any user interaction
-    window.addEventListener('click', () => {
-      initAudioContext();
-    }, { once: true });
+async function enterApp() {
+  $('auth-screen').classList.add('hidden');
+  $('app-screen').classList.remove('hidden');
+  $('role-badge').textContent = ({patient:'Patient', caregiver:'Caregiver', provider:'Provider'})[state.user.role] || state.user.role;
+  await refresh();
+  setupSSE();
+  registerServiceWorker();
+}
 
-    // ==============================================================
-    // 2. SERVER COMMUNICATION & REALTIME SSE EVENT STREAM
-    // ==============================================================
-    async function fetchState() {
-      try {
-        const res = await fetch('/api/state');
-        const data = await res.json();
-        updateFullUI(data);
-      } catch (err) {
-        console.error('Failed to fetch initial state:', err);
-      }
-    }
-
-    function setupSSE() {
-      const connIndicator = document.getElementById('conn-indicator');
-      const connText = document.getElementById('conn-text');
-
-      const evtSource = new EventSource('/api/events');
-
-      evtSource.onopen = () => {
-        connIndicator.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse';
-        connText.textContent = 'Realtime Connected';
-      };
-
-      evtSource.onerror = (e) => {
-        connIndicator.className = 'w-2.5 h-2.5 rounded-full bg-amber-500';
-        connText.textContent = 'Reconnecting...';
-      };
-
-      evtSource.onmessage = (e) => {
-        try {
-          const payload = JSON.parse(e.data);
-          handleRealtimeEvent(payload);
-        } catch (err) {
-          // Heartbeat or comment
-        }
-      };
-    }
-
-    function handleRealtimeEvent(payload) {
-      const { type, data } = payload;
-      console.log('SSE Received:', type, data);
-
-      if (type === 'INIT_STATE' || type === 'STATE_UPDATED') {
-        updateFullUI(data);
-      } else if (type === 'ALARM_TRIGGERED') {
-        onAlarmTriggered(data);
-      } else if (type === 'ALARM_ACKNOWLEDGED') {
-        onAlarmAcknowledged(data);
-      } else if (type === 'SOS_TRIGGERED') {
-        onSosTriggered(data);
-      } else if (type === 'AMBULANCE_DISPATCHED') {
-        onAmbulanceDispatched(data);
-      } else if (type === 'SOS_RESOLVED') {
-        onSosResolved();
-      }
-    }
-
-    // ==============================================================
-    // 3. UI RENDERING & COMPONENT UPDATES
-    // ==============================================================
-    function updateFullUI(newState) {
-      appState = newState;
-
-      renderCaregiverView();
-      renderParentsView();
-      renderHospitalView();
-      renderSOSState();
-      renderAlarmState();
-    }
-
-    function renderCaregiverView() {
-      // Medication Select for Live Alert
-      const medSelect = document.getElementById('trigger-med-select');
-      medSelect.innerHTML = appState.medications.map(m => 
-        `<option value="${m.id}">${m.name} (${m.scheduledTime}) - ${m.condition}</option>`
-      ).join('');
-
-      // Caregiver Meds List
-      const listEl = document.getElementById('caregiver-meds-list');
-      listEl.innerHTML = appState.medications.map(m => {
-        let statusBadge = '';
-        if (m.status === 'taken') {
-          statusBadge = `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">✓ Taken (${m.lastAcknowledged || 'On Time'})</span>`;
-        } else if (m.status === 'ringing') {
-          statusBadge = `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse">🔔 Ringing Now</span>`;
-        } else if (m.status === 'snoozed') {
-          statusBadge = `<span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">⏰ Snoozed (10m)</span>`;
-        } else {
-          statusBadge = `<span class="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-800 text-slate-400 border border-slate-700">Scheduled</span>`;
-        }
-
-        return `
-          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80 hover:border-slate-700 transition-all flex items-center justify-between">
-            <div>
-              <div class="flex items-center space-x-2">
-                <span class="font-bold text-xs text-white">${m.name}</span>
-                <span class="text-[11px] font-mono text-emerald-400 font-semibold">${m.scheduledTime}</span>
-              </div>
-              <div class="text-[11px] text-slate-400 mt-0.5">${m.instructions}</div>
-            </div>
-            <div class="flex items-center space-x-2">
-              ${statusBadge}
-              <button onclick="deleteMedication('${m.id}')" class="text-slate-500 hover:text-red-400 text-xs px-1" title="Remove medication">&times;</button>
-            </div>
-          </div>
-        `;
-      }).join('');
-
-      // Adherence stats
-      const takenCount = appState.medications.filter(m => m.status === 'taken').length;
-      document.getElementById('adherence-stat').textContent = `${takenCount} of ${appState.medications.length} Taken`;
-
-      // Audit Logs
-      const logEl = document.getElementById('caregiver-audit-log');
-      logEl.innerHTML = appState.audit_logs.map(log => `
-        <div class="border-b border-slate-900 pb-1">
-          <span class="text-slate-500">[${log.timestamp}]</span>
-          <span class="${log.type === 'sos_alert' ? 'text-red-400 font-bold' : log.type === 'alarm_triggered' ? 'text-amber-400 font-semibold' : log.type === 'med_taken' ? 'text-emerald-400' : 'text-slate-300'}">
-            ${log.message}
-          </span>
-        </div>
-      `).join('');
-    }
-
-    function renderParentsView() {
-      const cardsEl = document.getElementById('parent-meds-cards');
-      cardsEl.innerHTML = appState.medications.map(m => {
-        const isTaken = m.status === 'taken';
-        return `
-          <div class="p-3.5 rounded-xl border ${isTaken ? 'bg-emerald-950/20 border-emerald-500/30' : 'bg-slate-900 border-slate-800'} flex items-center justify-between transition-all">
-            <div class="space-y-0.5">
-              <div class="flex items-center space-x-2">
-                <span class="font-bold text-sm text-white">${m.name}</span>
-                <span class="text-xs font-mono font-bold text-amber-400">${m.scheduledTime}</span>
-              </div>
-              <div class="text-xs text-slate-400">${m.instructions}</div>
-            </div>
-            <div>
-              ${isTaken ? 
-                `<span class="px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-bold">✓ Kheyechi</span>` :
-                `<button onclick="parentAcknowledgeSingleMed('${m.id}')" class="px-3 py-1.5 bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-300 text-xs font-bold rounded-lg border border-slate-700 transition-all">Mark Done</button>`
-              }
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    function renderHospitalView() {
-      const noSosEl = document.getElementById('hospital-no-sos');
-      const activeSosEl = document.getElementById('hospital-active-sos');
-      const badgeStatus = document.getElementById('hospital-badge-status');
-
-      if (appState.activeSOS) {
-        noSosEl.classList.add('hidden');
-        activeSosEl.classList.remove('hidden');
-        badgeStatus.className = 'px-2.5 py-1 text-xs font-semibold rounded-lg bg-red-500/20 text-red-300 border border-red-500/30 animate-pulse';
-        badgeStatus.textContent = 'ACTIVE SOS EMERGENCY';
-
-        document.getElementById('sos-timestamp').textContent = appState.activeSOS.timestamp || 'Immediate';
-
-        const enRouteCard = document.getElementById('ambulance-en-route-card');
-        const actionBlock = document.getElementById('ambulance-action-block');
-
-        if (appState.activeSOS.status === 'AMBULANCE_DISPATCHED') {
-          enRouteCard.classList.remove('hidden');
-          actionBlock.classList.add('hidden');
-          document.getElementById('ambulance-eta').textContent = `ETA: ${appState.activeSOS.driver ? appState.activeSOS.driver.eta : '6 mins'}`;
-        } else {
-          enRouteCard.classList.add('hidden');
-          actionBlock.classList.remove('hidden');
-        }
-      } else {
-        noSosEl.classList.remove('hidden');
-        activeSosEl.classList.add('hidden');
-        badgeStatus.className = 'px-2.5 py-1 text-xs font-semibold rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
-        badgeStatus.textContent = 'Monitoring Normal';
-      }
-    }
-
-    function renderSOSState() {
-      const banner = document.getElementById('global-sos-banner');
-      if (appState.activeSOS) {
-        banner.classList.remove('hidden');
-        const bannerAmbulance = document.getElementById('banner-ambulance-status');
-        const bannerBtn = document.getElementById('banner-dispatch-btn');
-        if (appState.activeSOS.status === 'AMBULANCE_DISPATCHED') {
-          bannerAmbulance.innerHTML = `Hospital Status: <strong class="text-emerald-300">Ambulance Unit Dispatched (${appState.activeSOS.driver?.eta || '6m'})</strong>`;
-          bannerBtn.classList.add('hidden');
-        } else {
-          bannerAmbulance.innerHTML = `Hospital Status: <strong>Awaiting Ambulance Dispatch</strong>`;
-          bannerBtn.classList.remove('hidden');
-        }
-      } else {
-        banner.classList.add('hidden');
-      }
-    }
-
-    function renderAlarmState() {
-      const alarmScreen = document.getElementById('parent-alarm-screen');
-      if (appState.activeAlarm) {
-        alarmScreen.classList.remove('hidden');
-        document.getElementById('alarm-modal-med-name').textContent = appState.activeAlarm.medicationName || 'Scheduled Dose';
-        document.getElementById('alarm-modal-custom-message').textContent = `"${appState.activeAlarm.message}"`;
-      } else {
-        alarmScreen.classList.add('hidden');
-      }
-    }
-
-    // ==============================================================
-    // 4. EVENT RESPONSES & AUDIO ALARMS
-    // ==============================================================
-    function onAlarmTriggered(alarm) {
-      console.log('Starting Alarm Siren for:', alarm);
-      startSirenSound(false);
-      speakAnnouncement(`Alert from son Rohan in Kolkata. Baba, medication time: ${alarm.medicationName}.`);
-    }
-
-    function onAlarmAcknowledged(ack) {
-      console.log('Alarm acknowledged:', ack);
-      stopSirenSound();
-      if (ack.action === 'taken') {
-        speakAnnouncement("Confirmation received. Medicine marked as taken.");
-      }
-    }
-
-    function onSosTriggered(sos) {
-      console.log('🚨 SOS TRIGGERED 🚨');
-      startSirenSound(true);
-      speakAnnouncement("Critical emergency SOS activated! Notifying nearest hospital and child in Kolkata!");
-      
-      // Update Map Marker
-      if (patientMarker) {
-        patientMarker.bindPopup(`<b>🚨 EMERGENCY INCIDENT</b><br>${sos.patientName}<br>Blood: B+`).openPopup();
-      }
-    }
-
-    function onAmbulanceDispatched(sos) {
-      console.log('Ambulance dispatched:', sos);
-      speakAnnouncement("Emergency desk has dispatched Rapid Ambulance Unit 102. Estimated arrival in 6 minutes.");
-    }
-
-    function onSosResolved() {
-      stopSirenSound();
-      speakAnnouncement("Emergency incident marked as resolved. Normal monitoring resumed.");
-    }
-
-    // ==============================================================
-    // 5. USER ACTIONS & API CALLS
-    // ==============================================================
-    async function triggerRemoteAlarmFromCaregiver() {
-      const medId = document.getElementById('trigger-med-select').value;
-      const message = document.getElementById('trigger-message-input').value;
-
-      try {
-        await fetch('/api/trigger-alarm', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ medicationId: medId, message: message })
-        });
-      } catch (err) {
-        alert('Failed to send alarm: ' + err);
-      }
-    }
-
-    async function parentAcknowledgeAction(action) {
-      stopSirenSound();
-      try {
-        await fetch('/api/acknowledge-alarm', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: action })
-        });
-      } catch (err) {
-        alert('Failed to acknowledge: ' + err);
-      }
-    }
-
-    async function parentAcknowledgeSingleMed(medId) {
-      try {
-        await fetch('/api/acknowledge-alarm', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'taken', medicationId: medId })
-        });
-      } catch (err) {
-        console.error(err);
-      }
-    }
-
-    async function triggerEmergencySOS(source) {
-      try {
-        await fetch('/api/trigger-sos', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ source: source })
-        });
-      } catch (err) {
-        alert('Failed to trigger SOS: ' + err);
-      }
-    }
-
-    async function dispatchAmbulanceAction() {
-      try {
-        await fetch('/api/dispatch-ambulance', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ driverName: 'Rajesh Kumar (Unit 102)', vehicleNumber: 'DL-1T-4492', eta: '6 mins' })
-        });
-      } catch (err) {
-        alert('Dispatch error: ' + err);
-      }
-    }
-
-    async function resolveSosAction() {
-      stopSirenSound();
-      try {
-        await fetch('/api/resolve-sos', { method: 'POST' });
-      } catch (err) {
-        alert('Resolve error: ' + err);
-      }
-    }
-
-    async function submitNewMedication() {
-      const name = document.getElementById('new-med-name').value.trim();
-      const condition = document.getElementById('new-med-condition').value.trim();
-      const time = document.getElementById('new-med-time').value.trim();
-      const instructions = document.getElementById('new-med-instructions').value.trim();
-
-      if (!name) return alert('Please enter medicine name');
-
-      try {
-        await fetch('/api/medications', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, condition, scheduledTime: time, instructions })
-        });
-        closeAddMedModal();
-      } catch (err) {
-        alert('Failed to add: ' + err);
-      }
-    }
-
-    async function deleteMedication(id) {
-      if (!confirm('Remove this medication schedule?')) return;
-      try {
-        await fetch(`/api/medications/${id}`, { method: 'DELETE' });
-      } catch (err) {
-        console.error(err);
-      }
-    }
-
-    async function resetDemoState() {
-      stopSirenSound();
-      try {
-        await fetch('/api/reset-demo', { method: 'POST' });
-      } catch (err) {
-        alert('Reset failed: ' + err);
-      }
-    }
-
-    // ==============================================================
-    // 6. UI TOGGLES, MODALS & LEAFLET MAP
-    // ==============================================================
-    function toggleLockScreen() {
-      isLockScreenActive = !isLockScreenActive;
-      const lockScreen = document.getElementById('parent-lock-screen');
-      const toggleText = document.getElementById('lock-toggle-text');
-      
-      if (isLockScreenActive) {
-        lockScreen.classList.remove('hidden');
-        toggleText.textContent = 'Unlock Phone';
-      } else {
-        lockScreen.classList.add('hidden');
-        toggleText.textContent = 'Lock Phone';
-      }
-    }
-
-    function openAddMedModal() {
-      document.getElementById('modal-add-med').classList.remove('hidden');
-    }
-
-    function closeAddMedModal() {
-      document.getElementById('modal-add-med').classList.add('hidden');
-    }
-
-    function setViewMode(mode) {
-      const colCaregiver = document.getElementById('col-caregiver');
-      const colParent = document.getElementById('col-parent');
-      const colHospital = document.getElementById('col-hospital');
-      const layout = document.getElementById('view-layout');
-
-      // Update button styles
-      document.querySelectorAll('.view-btn').forEach(btn => {
-        btn.className = 'view-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-all';
+async function refresh() {
+  try {
+    const [account, notes] = await Promise.all([
+      apiOptional('/api/me/profile'),
+      apiOptional('/api/notifications')
+    ]);
+    state.accountProfile = account || { user: state.user, summary: {} };
+    state.notifications = notes?.notifications || [];
+    state.unread = notes?.unread || 0;
+    if (state.user.role === 'patient') {
+      state.selectedPatientId = state.user.id;
+      const [meds, alerts, sos, activity, profile, contacts, requests] = await Promise.all([
+        api(`/api/patients/${state.user.id}/medications`),
+        api(`/api/patients/${state.user.id}/alerts`),
+        api(`/api/patients/${state.user.id}/sos`),
+        api(`/api/patients/${state.user.id}/activity`),
+        api(`/api/patients/${state.user.id}/profile`),
+        api(`/api/patients/${state.user.id}/emergency-contacts`),
+        api('/api/family/requests')
+      ]);
+      Object.assign(state, {
+        meds: meds.medications, alerts: alerts.alerts, sos: sos.sos_events,
+        activity: activity.activity, profile: profile.profile, contacts: contacts.contacts,
+        requests: requests.relationships
       });
-      document.getElementById(`btn-view-${mode}`).className = 'view-btn px-3 py-1.5 rounded-lg text-xs font-semibold transition-all bg-emerald-600 text-white shadow-sm';
-
-      if (mode === 'multi') {
-        layout.className = 'grid grid-cols-1 lg:grid-cols-3 gap-6';
-        colCaregiver.classList.remove('hidden');
-        colParent.classList.remove('hidden');
-        colHospital.classList.remove('hidden');
-      } else if (mode === 'caregiver') {
-        layout.className = 'grid grid-cols-1 max-w-2xl mx-auto';
-        colCaregiver.classList.remove('hidden');
-        colParent.classList.add('hidden');
-        colHospital.classList.add('hidden');
-      } else if (mode === 'parent') {
-        layout.className = 'grid grid-cols-1 max-w-md mx-auto';
-        colCaregiver.classList.add('hidden');
-        colParent.classList.remove('hidden');
-        colHospital.classList.add('hidden');
-      } else if (mode === 'hospital') {
-        layout.className = 'grid grid-cols-1 max-w-3xl mx-auto';
-        colCaregiver.classList.add('hidden');
-        colParent.classList.add('hidden');
-        colHospital.classList.remove('hidden');
+    } else if (state.user.role === 'caregiver') {
+      const patients = await api('/api/family/patients');
+      state.patients = patients.patients;
+      if (!state.patients.some(p => p.id === state.selectedPatientId)) {
+        state.selectedPatientId = state.patients[0]?.id || null;
       }
+      const sel = $('patient-selector');
+      sel.classList.remove('hidden');
+      sel.innerHTML = state.patients.map(p => `<option value="${p.id}" ${p.id === state.selectedPatientId ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
+      if (state.selectedPatientId) {
+        const pid = state.selectedPatientId;
+        const [meds, alerts, sos, activity] = await Promise.all([
+          api(`/api/patients/${pid}/medications`),
+          api(`/api/patients/${pid}/alerts`),
+          api(`/api/patients/${pid}/sos`),
+          api(`/api/patients/${pid}/activity`)
+        ]);
+        Object.assign(state, { meds: meds.medications, alerts: alerts.alerts, sos: sos.sos_events, activity: activity.activity });
+      } else {
+        state.meds = state.alerts = state.sos = state.activity = [];
+      }
+    } else {
+      const res = await api('/api/provider/requests');
+      state.providerRequests = res.requests;
+      state.providerFacility = res.facility;
+      state.providerCounts = res.counts || { open: 0, acknowledged: 0, total: 0 };
+    }
+    render();
+  } catch (err) {
+    if (err.message.includes('sign in')) { logout(); return; }
+    console.error(err);
+    showToast('Could not refresh', err.message, 'warning');
+    if (state.user) render();
+  }
+}
 
-      // Invalidate Leaflet map size on layout change
-      if (mapInstance) {
-        setTimeout(() => mapInstance.invalidateSize(), 200);
+function selectPatient(id) { state.selectedPatientId = id; refresh(); }
+
+function render() {
+  const role = state.user.role;
+  ['caregiver','patient','provider'].forEach(r => $(`view-${r}`).classList.toggle('hidden', r !== role));
+  renderHeader();
+  renderNotifications();
+  if (!$('profile-modal').classList.contains('hidden')) renderProfileModal();
+  if (role === 'caregiver') renderCaregiver();
+  if (role === 'patient') renderPatient();
+  if (role === 'provider') renderProvider();
+}
+
+function renderHeader() {
+  const name = state.user?.name || state.accountProfile?.user?.name || 'Account';
+  $('header-name').textContent = name;
+  $('header-avatar').textContent = initials(name);
+  $('profile-modal-avatar').textContent = initials(name);
+  $('role-badge').textContent = ({patient:'Patient', caregiver:'Caregiver', provider:'Provider'})[state.user.role] || state.user.role;
+}
+
+function profileSummaryHtml() {
+  const account = state.accountProfile || {};
+  const user = account.user || state.user || {};
+  const summary = account.summary || {};
+  if (state.user.role === 'patient') {
+    return `
+      <p><span class="text-slate-500">Name:</span> <strong>${esc(user.name)}</strong></p>
+      <p><span class="text-slate-500">City:</span> <strong>${esc(user.city || 'Not set')}</strong></p>
+      <p><span class="text-slate-500">Connected caregivers:</span> <strong>${summary.caregivers ?? 0}</strong></p>
+      <p><span class="text-slate-500">Medicines:</span> <strong>${summary.medicines ?? 0}</strong></p>`;
+  }
+  if (state.user.role === 'caregiver') {
+    return `
+      <p><span class="text-slate-500">Name:</span> <strong>${esc(user.name)}</strong></p>
+      <p><span class="text-slate-500">City:</span> <strong>${esc(user.city || 'Not set')}</strong></p>
+      <p><span class="text-slate-500">Approved patients:</span> <strong>${summary.patients ?? 0}</strong></p>
+      <p class="text-[11px] text-slate-500 pt-1">Edit your name, phone and city from your profile.</p>`;
+  }
+  return `
+    <p><span class="text-slate-500">Name:</span> <strong>${esc(user.name)}</strong></p>
+    <p><span class="text-slate-500">Facility:</span> <strong>${esc(summary.facility || 'Not linked')}</strong></p>
+    <p><span class="text-slate-500">City:</span> <strong>${esc(user.city || 'Not set')}</strong></p>`;
+}
+
+function statusPill(status) {
+  const map = {
+    taken: ['bg-emerald-50 text-emerald-700 border-emerald-200','Taken'],
+    pending: ['bg-amber-50 text-amber-700 border-amber-200','Due'],
+    missed: ['bg-rose-50 text-rose-600 border-rose-500/30','Missed'],
+    snoozed: ['bg-violet-50 text-violet-300 border-violet-500/30','Snoozed'],
+    scheduled: ['bg-slate-200/50 text-slate-700 border-slate-600','Scheduled']
+  };
+  const [cls, label] = map[status] || map.scheduled;
+  return `<span class="pill border ${cls}">${label}</span>`;
+}
+
+function renderCaregiver() {
+  $('caregiver-greeting').textContent = `${greeting()}, ${state.user.name.split(' ')[0]}`;
+  $('stat-meds').textContent = state.meds.length;
+  $('stat-patients').textContent = state.patients.length;
+  $('stat-open-sos').textContent = state.sos.filter(s => s.status === 'open').length;
+  $('caregiver-profile-summary').innerHTML = profileSummaryHtml();
+  $('caregiver-meds').innerHTML = state.meds.length ? state.meds.map(m => `
+    <div class="flex items-center justify-between gap-2 bg-white border border-slate-200 rounded-xl p-3">
+      <div class="min-w-0">
+        <p class="font-bold truncate">${esc(m.name)} <span class="text-emerald-600 font-mono text-sm">${esc(m.schedule_time)}</span></p>
+        <p class="text-xs text-slate-600 truncate">${esc(m.dose)} ${esc(m.instructions)}</p>
+      </div>
+      <div class="flex items-center gap-2">${statusPill(m.today_status)}<button onclick="deleteMed('${m.id}')" class="text-slate-500 hover:text-rose-600" title="Remove">✕</button></div>
+    </div>`).join('') : '<p class="text-sm text-slate-500">No medicines scheduled yet.</p>';
+
+  $('alert-types').innerHTML = Object.entries(ALERT_TYPES).map(([key,label]) => `
+    <button onclick="pickAlertType('${key}')" class="pill border ${state.alertType===key?'bg-amber-100 border-amber-400 text-amber-200':'bg-slate-100 border-slate-300 text-slate-700'}">${label}</button>`).join('');
+
+  $('caregiver-sos').innerHTML = state.sos.length ? state.sos.slice(0,3).map(s => `
+    <button onclick="openSos('${s.id}')" class="w-full text-left bg-red-50/30 border border-red-200 rounded-xl p-3 hover:border-red-500">
+      <div class="flex justify-between"><span class="font-bold text-red-700">Emergency request</span><span class="text-xs text-slate-600">${fmt(s.created_at)}</span></div>
+      <p class="text-xs text-slate-700 mt-1">${esc(s.notes)}</p>
+      <p class="text-[11px] text-slate-500">Status: ${esc(s.status)} · ${s.deliveries.filter(d=>d.status==='acknowledged').length} acknowledged</p>
+    </button>`).join('') : '<p class="text-sm text-slate-500">No emergency requests.</p>';
+
+  $('caregiver-family').innerHTML = state.patients.length ? state.patients.map(p => `
+    <div class="bg-white border border-slate-200 rounded-xl p-3 flex justify-between items-center">
+      <div><p class="font-bold">${esc(p.name)}</p><p class="text-xs text-slate-600">${esc(p.city)} · Manage meds: ${p.can_manage_meds?'yes':'no'}</p></div>
+      <span class="pill bg-emerald-50 text-emerald-700 border border-emerald-200">Active</span>
+    </div>`).join('') : '<p class="text-sm text-slate-500">No approved patients yet. Ask the patient to generate an invite code, then enter it on your account?</p>';
+
+  $('caregiver-activity').innerHTML = activityHtml();
+}
+
+function renderPatient() {
+  const taken = state.meds.filter(m => m.today_status === 'taken').length;
+  const percent = state.meds.length ? Math.round((taken / state.meds.length) * 100) : 0;
+  $('patient-greeting').textContent = `${greeting()}, ${state.user.name.split(' ')[0]}`;
+  $('patient-progress').style.width = `${percent}%`;
+  $('patient-adherence-text').textContent = `${taken} / ${state.meds.length}`;
+  $('patient-profile-summary').innerHTML = profileSummaryHtml();
+  $('patient-meds').innerHTML = state.meds.length ? state.meds.map(m => `
+    <div class="rounded-2xl border ${m.today_status==='taken'?'border-emerald-200 bg-emerald-50':'border-slate-300 bg-white'} p-4 flex items-center justify-between gap-3">
+      <div class="min-w-0">
+        <p class="text-lg font-extrabold">${esc(m.name)}</p>
+        <p class="text-sm text-slate-600">${esc(m.dose)} · ${esc(m.schedule_time)} · ${esc(m.instructions)}</p>
+      </div>
+      <div class="flex gap-2 shrink-0">
+        ${m.today_status==='taken'
+          ? statusPill('taken')
+          : `<button onclick="ackMed('${m.id}','taken')" class="btn bg-emerald-600 hover:bg-emerald-500">✓ Taken</button>
+             <button onclick="ackMed('${m.id}','snooze')" class="btn bg-slate-200 hover:bg-slate-300">Snooze</button>`}
+      </div>
+    </div>`).join('') : '<p class="text-slate-500">No medicines scheduled.</p>';
+  $('adherence').textContent = `${taken} / ${state.meds.length} taken`;
+
+  $('patient-alerts').innerHTML = state.alerts.length ? state.alerts.slice(0,6).map(a => `
+    <div class="rounded-xl border ${a.status==='acknowledged'?'border-slate-200 bg-slate-50':'border-amber-300 bg-amber-50'} p-3 flex justify-between gap-3">
+      <div><p class="font-bold">${esc(ALERT_TYPES[a.alert_type] || 'Alert')}</p><p class="text-sm text-slate-700">${esc(a.message)}</p><p class="text-xs text-slate-500">${fmt(a.created_at)}</p></div>
+      ${a.status==='acknowledged' ? '<span class="pill bg-emerald-50 text-emerald-700 border border-emerald-200">Seen</span>' : `<button onclick="ackAlert('${a.id}')" class="btn bg-emerald-600">Got it</button>`}
+    </div>`).join('') : '<p class="text-sm text-slate-500">No alerts yet.</p>';
+
+  const p = state.profile || {};
+  $('profile-view').innerHTML = `
+    <p><span class="text-slate-600">Blood group:</span> <strong>${esc(p.blood_group || 'Not set')}</strong></p>
+    <p><span class="text-slate-600">Allergies:</span> <strong>${esc(p.allergies || 'None recorded')}</strong></p>
+    <p><span class="text-slate-600">Conditions:</span> <strong>${esc(p.conditions || 'None recorded')}</strong></p>
+    <p><span class="text-slate-600">Doctor:</span> <strong>${esc(p.doctor_name || 'Not set')}</strong> ${esc(p.doctor_phone)}</p>
+    <p><span class="text-slate-600">Share in SOS:</span> <strong>${p.share_medical ? 'Yes' : 'No'}</strong></p>`;
+  const form = $('profile-form');
+  form.blood_group.value = p.blood_group || '';
+  form.allergies.value = p.allergies || '';
+  form.conditions.value = p.conditions || '';
+  form.doctor_name.value = p.doctor_name || '';
+  form.doctor_phone.value = p.doctor_phone || '';
+  form.share_medical.checked = !!p.share_medical;
+
+  $('contacts-list').innerHTML = state.contacts.length ? state.contacts.map(c => `
+    <div class="flex justify-between items-center bg-white border border-slate-200 rounded-lg p-2">
+      <span>${esc(c.name)} · ${esc(c.phone)} <span class="text-xs text-slate-500">${esc(c.relation)}</span></span>
+      <span class="pill ${c.verified?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'} border ${c.verified?'border-emerald-200':'border-amber-200'}">${c.verified?'Verified':'Unverified'}</span>
+    </div>`).join('') : '<p class="text-slate-500">No contacts added.</p>';
+
+  $('family-requests').innerHTML = state.requests.length ? state.requests.map(r => `
+    <div class="bg-white border border-slate-200 rounded-lg p-3">
+      <p class="text-sm font-semibold">${esc(r.caregiver_name)} wants access</p>
+      ${r.status==='pending'
+        ? `<div class="flex gap-2 mt-2"><button onclick="approveReq('${r.id}',true)" class="btn bg-emerald-600">Allow medicines</button><button onclick="approveReq('${r.id}',false)" class="btn bg-slate-200">Decline</button></div>`
+        : `<p class="text-xs text-slate-500">${esc(r.status)}</p>`}
+    </div>`).join('') : '<p class="text-xs text-slate-500">No family requests.</p>';
+}
+
+function activityHtml() {
+  return state.activity.length ? state.activity.slice(0,12).map(a => `
+    <div class="border-b border-slate-200 py-1.5"><span class="text-slate-500 text-xs">${fmt(a.created_at)}</span> · ${esc(a.detail)}</div>`).join('') : '<p class="text-sm text-slate-500">No activity yet.</p>';
+}
+
+function renderProvider() {
+  const f = state.providerFacility;
+  const c = state.providerCounts;
+  $('provider-greeting').textContent = `${greeting()}, ${state.user.name.split(' ')[0]}`;
+  $('provider-stat-open').textContent = c.open;
+  $('provider-stat-ack').textContent = c.acknowledged;
+  $('provider-stat-total').textContent = c.total;
+  $('provider-profile-summary').innerHTML = profileSummaryHtml();
+  $('provider-facility').innerHTML = f ? `
+    <p class="font-semibold text-slate-800">${esc(f.name)}</p>
+    <p>${esc(f.address || 'Address not provided')}${f.city ? ' · ' + esc(f.city) : ''}</p>
+    <p>${f.phone ? 'Phone: ' + esc(f.phone) : 'Phone not provided'}</p>
+    <p class="mt-2">
+      <span class="pill bg-emerald-50 border border-emerald-200 text-emerald-700">Request desk active</span>
+      <span class="pill bg-slate-100 border border-slate-300 text-slate-700">No external dispatch connected</span>
+    </p>
+  ` : '<p class="text-amber-700">No facility is linked to this account. Ask your administrator to attach a registered facility.</p>';
+
+  $('provider-count').textContent = `${c.total} request${c.total === 1 ? '' : 's'} · ${c.open} open`;
+
+  $('provider-requests').innerHTML = state.providerRequests.length ? state.providerRequests.map(s => {
+    const mine = s.deliveries.find(d => d.channel === 'facility_integration');
+    return `
+      <div class="bg-white border ${s.status==='open'?'border-red-300':'border-slate-200'} rounded-xl p-4 space-y-2">
+        <div class="flex justify-between"><h3 class="font-bold text-red-700">${esc(s.patient_name)}</h3><span class="text-xs text-slate-600">${fmt(s.created_at)}</span></div>
+        ${patientIdentityHtml(s)}
+        <p class="text-sm">${esc(s.notes)}</p>
+        <p class="text-xs text-slate-600">Location: ${locationHtml(s)}</p>
+        <div class="soft-card text-xs space-y-1"><p class="font-bold text-slate-700">Shared patient details</p>${medicalHtml(s)}</div>
+        <p class="text-xs text-slate-500">Delivery to your desk: ${esc(mine?.recipient_label || 'request desk')}</p>
+        <div class="flex flex-wrap gap-2">
+          <button onclick="openSos('${s.id}')" class="btn btn-ghost">View SOS details</button>
+          ${s.status==='open'
+            ? `<button onclick="respondSos('${s.id}','acknowledged')" class="btn bg-emerald-600">Acknowledge request</button><button onclick="respondSos('${s.id}','unable')" class="btn bg-slate-200">Unable to respond</button>`
+            : `<span class="pill bg-slate-100 border border-slate-300">${esc(s.status)}</span>`}
+        </div>
+      </div>`;
+  }).join('') : `
+    <div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
+      <p class="font-semibold text-slate-800">No requests yet</p>
+      <p class="text-sm text-slate-600 mt-1">A request appears here when an ElderGuard patient triggers SOS and your facility desk is included in routing. Keep this page open or use Refresh to check again.</p>
+    </div>`;
+}
+
+function toggleAddMed() { $('add-med-form').classList.toggle('hidden'); }
+function toggleProfile() { $('profile-form').classList.toggle('hidden'); }
+
+const NOTIF_ICONS = {
+  medication_added: '💊', medication_due: '⏰', alert: '🔔', sos: '🚨', medicine: '💊'
+};
+
+function renderNotifications() {
+  const badge = $('notif-badge');
+  badge.textContent = state.unread;
+  badge.classList.toggle('hidden', state.unread === 0);
+  $('notif-subtitle').textContent = state.unread ? `${state.unread} unread` : "You're up to date";
+  $('notification-list').innerHTML = state.notifications.length ? state.notifications.map(n => `
+    <button onclick="markNotificationRead('${n.id}')" class="notif-item w-full text-left rounded-lg p-2.5 border border-slate-200 ${n.read ? '' : 'unread'}">
+      <div class="flex items-start gap-2">
+        <span class="text-lg leading-none">${NOTIF_ICONS[n.type] || '✨'}</span>
+        <div class="min-w-0 flex-1">
+          <div class="flex justify-between gap-2">
+            <p class="text-sm font-bold truncate">${esc(n.title)}</p>
+            <span class="text-[10px] text-slate-500 shrink-0">${timeAgo(n.created_at)}</span>
+          </div>
+          <p class="text-xs text-slate-600 mt-0.5">${esc(n.body)}</p>
+        </div>
+      </div>
+    </button>`).join('') : '<p class="text-sm text-slate-500 py-3">No notifications yet. Medicine changes and alerts will appear here.</p>';
+}
+
+function toggleNotifications() {
+  $('notification-panel').classList.toggle('hidden');
+  $('profile-modal').classList.add('hidden');
+  if (!$('notification-panel').classList.contains('hidden')) refresh();
+}
+
+async function markNotificationRead(id) {
+  const item = state.notifications.find(n => n.id === id);
+  if (item && !item.read) {
+    item.read = 1;
+    state.unread = Math.max(0, state.unread - 1);
+    renderNotifications();
+  }
+  try { await api(`/api/notifications/${id}/read`, { method:'POST' }); } catch {}
+}
+
+async function markAllRead() {
+  state.notifications.forEach(n => { n.read = 1; });
+  state.unread = 0;
+  renderNotifications();
+  try { await api('/api/notifications/read-all', { method:'POST' }); } catch {}
+}
+
+function openProfileModal() {
+  state.profileEditing = false;
+  $('notification-panel').classList.add('hidden');
+  renderProfileModal();
+  $('profile-modal').classList.remove('hidden');
+}
+
+function closeProfileModal() {
+  state.profileEditing = false;
+  $('profile-modal').classList.add('hidden');
+}
+
+function toggleProfileEdit(edit) {
+  state.profileEditing = edit;
+  renderProfileModal();
+  if (edit) setTimeout(() => $('account-profile-form').querySelector('[name=name]').focus(), 40);
+}
+
+function renderProfileModal() {
+  const account = state.accountProfile || {};
+  const user = account.user || state.user || {};
+  const summary = account.summary || {};
+  const roleLabel = ({patient:'Patient', caregiver:'Caregiver', provider:'Provider'})[user.role] || 'Member';
+  $('profile-modal-title').textContent = user.name || 'My profile';
+  $('profile-modal-subtitle').textContent = `${roleLabel} account · ${user.email || ''}`;
+  $('profile-modal-avatar').textContent = initials(user.name);
+  $('profile-view-box').innerHTML = `
+    <div class="soft-card">
+      <div class="grid sm:grid-cols-2 gap-3 text-sm">
+        <p><span class="text-slate-500">Full name</span><br><strong>${esc(user.name || 'Not set')}</strong></p>
+        <p><span class="text-slate-500">Phone</span><br><strong>${esc(user.phone || 'Not set')}</strong></p>
+        <p><span class="text-slate-500">Email</span><br><strong>${esc(user.email || 'Not set')}</strong></p>
+        <p><span class="text-slate-500">City</span><br><strong>${esc(user.city || 'Not set')}</strong></p>
+      </div>
+    </div>
+    <div class="text-sm space-y-1">
+      ${state.user.role === 'patient' ? `<p><span class="text-slate-500">Caregivers connected:</span> <strong>${summary.caregivers ?? 0}</strong></p><p><span class="text-slate-500">Medicines scheduled:</span> <strong>${summary.medicines ?? 0}</strong></p>` : ''}
+      ${state.user.role === 'caregiver' ? `<p><span class="text-slate-500">Approved patients:</span> <strong>${summary.patients ?? 0}</strong></p>` : ''}
+      ${state.user.role === 'provider' ? `<p><span class="text-slate-500">Facility:</span> <strong>${esc(summary.facility || 'Not linked')}</strong></p>` : ''}
+    </div>`;
+  const form = $('account-profile-form');
+  form.querySelector('[name=name]').value = user.name || '';
+  form.querySelector('[name=phone]').value = user.phone || '';
+  form.querySelector('[name=city]').value = user.city || '';
+  form.classList.toggle('hidden', !state.profileEditing);
+  $('profile-view-box').classList.toggle('hidden', state.profileEditing);
+  $('profile-modal-actions').classList.toggle('hidden', state.profileEditing);
+}
+
+async function saveAccountProfile(event) {
+  event.preventDefault();
+  const data = Object.fromEntries(new FormData(event.target).entries());
+  try {
+    const res = await api('/api/me/profile', { method:'PUT', body:data });
+    state.accountProfile.user = res.user;
+    state.user = { ...state.user, ...res.user };
+    state.profileEditing = false;
+    render();
+    showToast('Profile saved', 'Your account details are up to date.', 'success');
+  } catch (err) { alert(err.message); }
+}
+
+function showToast(title, body, tone = 'info') {
+  const stack = $('toast-stack');
+  const palette = tone === 'danger'
+    ? 'border-rose-200 bg-white text-rose-700'
+    : tone === 'warning'
+      ? 'border-amber-200 bg-white text-amber-800'
+      : 'border-emerald-200 bg-white text-emerald-800';
+  const el = document.createElement('div');
+  el.className = `toast panel p-3 border-l-4 ${palette}`;
+  el.innerHTML = `
+    <div class="flex items-start justify-between gap-2">
+      <div class="min-w-0"><p class="text-sm font-extrabold">${esc(title)}</p><p class="text-xs text-slate-600 mt-0.5">${esc(body)}</p></div>
+      <button onclick="this.parentElement.parentElement.remove()" class="text-slate-400 hover:text-slate-700 leading-none">&times;</button>
+    </div>`;
+  stack.prepend(el);
+  while (stack.children.length > 4) stack.lastElementChild.remove();
+  setTimeout(() => el.remove(), 7000);
+}
+
+function playChime() {
+  tone(880, 'sine', .18, .14);
+  setTimeout(() => tone(1174, 'sine', .26, .12), 150);
+}
+
+function pickAlertType(type) { state.alertType = type; render(); }
+
+async function addMedication(event) {
+  event.preventDefault();
+  const data = Object.fromEntries(new FormData(event.target).entries());
+  try {
+    await api(`/api/patients/${state.selectedPatientId}/medications`, { method:'POST', body:data });
+    event.target.reset(); event.target.schedule_time.value = '09:00';
+    $('add-med-form').classList.add('hidden');
+    await refresh();
+  } catch (err) { alert(err.message); }
+}
+
+async function deleteMed(id) {
+  if (!confirm('Remove this medicine schedule?')) return;
+  try { await api(`/api/medications/${id}`, { method:'DELETE' }); await refresh(); } catch (err) { alert(err.message); }
+}
+
+async function ackMed(id, action) {
+  try { await api(`/api/medications/${id}/acknowledge`, { method:'POST', body:{ action } }); await refresh(); } catch (err) { alert(err.message); }
+}
+
+async function sendAlert() {
+  try {
+    await api(`/api/patients/${state.selectedPatientId}/alerts`, { method:'POST', body:{ type:state.alertType, message:$('alert-message').value } });
+    $('alert-message').value = '';
+    await refresh();
+  } catch (err) { alert(err.message); }
+}
+
+async function ackAlert(id) {
+  try { await api(`/api/alerts/${id}/acknowledge`, { method:'POST', body:{} }); await refresh(); } catch (err) { alert(err.message); }
+}
+
+async function saveProfile(event) {
+  event.preventDefault();
+  const data = Object.fromEntries(new FormData(event.target).entries());
+  data.share_medical = event.target.share_medical.checked;
+  try { await api(`/api/patients/${state.user.id}/profile`, { method:'PUT', body:data }); await refresh(); } catch (err) { alert(err.message); }
+}
+
+async function addContact(event) {
+  event.preventDefault();
+  const data = Object.fromEntries(new FormData(event.target).entries());
+  try { await api(`/api/patients/${state.user.id}/emergency-contacts`, { method:'POST', body:data }); event.target.reset(); await refresh(); } catch (err) { alert(err.message); }
+}
+
+async function generateInvite() {
+  try { const res = await api('/api/family/invite', { method:'POST' }); $('invite-code').textContent = res.code; } catch (err) { alert(err.message); }
+}
+
+async function approveReq(id, allow) {
+  try {
+    await api(`/api/family/${id}/${allow?'approve':'decline'}`, { method:'POST', body:{ can_manage_meds:allow, can_view_health:allow } });
+    await refresh();
+  } catch (err) { alert(err.message); }
+}
+
+async function requestFamily(event) {
+  event.preventDefault();
+  try {
+    await api('/api/family/request', { method:'POST', body:Object.fromEntries(new FormData(event.target).entries()) });
+    event.target.reset();
+    alert('Request sent. Ask the patient to approve it in their Family access card.');
+    await refresh();
+  } catch (err) { alert(err.message); }
+}
+
+async function respondSos(id, status) {
+  try { await api(`/api/sos/${id}/respond`, { method:'POST', body:{ status } }); await refresh(); } catch (err) { alert(err.message); }
+}
+
+async function openSos(id) {
+  try {
+    const res = await api(`/api/sos/${id}`);
+    const s = res.sos;
+    $('sos-modal-body').innerHTML = `
+      <div class="soft-card space-y-1">
+        <p class="font-bold text-slate-700">Shared patient details</p>
+        ${patientIdentityHtml(s)}
+        ${medicalHtml(s)}
+      </div>
+      <p><span class="text-slate-600">Note:</span> ${esc(s.notes)}</p>
+      <p><span class="text-slate-600">Location:</span> ${locationHtml(s)}</p>
+      <p><span class="text-slate-600">Status:</span> <strong>${esc(s.status)}</strong></p>
+      <div class="pt-2">${s.deliveries.map(d => `<div class="flex justify-between text-xs border-b border-slate-200 py-1"><span>${esc(d.recipient_label)} <span class="text-slate-500">(${esc(d.channel)})</span></span><span class="text-${d.status==='acknowledged'?'emerald':'slate'}-400">${esc(d.status)}${d.last_error?' · '+esc(d.last_error):''}</span></div>`).join('')}</div>
+      ${s.status==='open' ? `<button onclick="resolveSos('${s.id}')" class="btn bg-emerald-600 mt-2">Mark resolved</button>` : ''}`;
+    $('sos-modal').classList.remove('hidden');
+  } catch (err) { alert(err.message); }
+}
+
+function closeSosModal() { $('sos-modal').classList.add('hidden'); }
+
+async function resolveSos(id) {
+  try { await api(`/api/sos/${id}/resolve`, { method:'POST', body:{} }); closeSosModal(); await refresh(); } catch (err) { alert(err.message); }
+}
+
+function currentPosition() {
+  return new Promise(resolve => {
+    if (!navigator.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve({ lat:pos.coords.latitude, lng:pos.coords.longitude, accuracy:pos.coords.accuracy }),
+      () => resolve(null),
+      { timeout:8000 }
+    );
+  });
+}
+
+async function fireSos() {
+  const location = await currentPosition();
+  const pid = state.selectedPatientId || state.user.id;
+  try {
+    const res = await api(`/api/patients/${pid}/sos`, {
+      method:'POST',
+      body:{ ...(location || {}), notes:'Emergency help requested via ElderGuard SOS.' }
+    });
+    startSiren(true);
+    speak('Emergency request sent to your contacts and participating facilities.');
+    if (Notification.permission === 'granted') new Notification('ElderGuard SOS sent', { body: res.warning });
+    await refresh();
+    await openSos(res.sos.id);
+  } catch (err) { alert(err.message); }
+}
+
+function setupSosHold() {
+  const btn = $('sos-hold');
+  const ring = $('sos-ring');
+  const start = () => {
+    if (state.sosHoldTimer) return;
+    ring.classList.add('active');
+    $('sos-hint').textContent = 'Keep holding...';
+    state.sosHoldTimer = setTimeout(() => {
+      ring.classList.remove('active');
+      state.sosHoldTimer = null;
+      $('sos-hint').textContent = 'Sending emergency request...';
+      fireSos();
+    }, 2000);
+  };
+  const cancel = () => {
+    if (state.sosHoldTimer) clearTimeout(state.sosHoldTimer);
+    state.sosHoldTimer = null;
+    ring.classList.remove('active');
+    $('sos-hint').textContent = 'Press and hold for 2 seconds';
+  };
+  btn.addEventListener('pointerdown', start);
+  ['pointerup','pointerleave','pointercancel'].forEach(evt => btn.addEventListener(evt, cancel));
+}
+
+function initAudio() {
+  if (!state.audioCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) state.audioCtx = new AC();
+  }
+  if (state.audioCtx?.state === 'suspended') state.audioCtx.resume();
+}
+
+function tone(freq, type='sine', duration=.3, gain=.18) {
+  try {
+    initAudio();
+    const osc = state.audioCtx.createOscillator();
+    const vol = state.audioCtx.createGain();
+    osc.type = type; osc.frequency.value = freq;
+    vol.gain.setValueAtTime(gain, state.audioCtx.currentTime);
+    vol.gain.exponentialRampToValueAtTime(.0001, state.audioCtx.currentTime + duration);
+    osc.connect(vol).connect(state.audioCtx.destination);
+    osc.start(); osc.stop(state.audioCtx.currentTime + duration);
+  } catch {}
+}
+
+function startSiren(emergency=false) {
+  stopSiren(); initAudio();
+  let flip = false;
+  state.siren = setInterval(() => {
+    tone(flip ? (emergency?1100:880) : (emergency?750:587), emergency?'sawtooth':'sine', .3, .2);
+    flip = !flip;
+  }, 420);
+  state.sirenStopTimer = setTimeout(stopSiren, 12000);
+}
+
+function stopSiren() {
+  if (state.siren) clearInterval(state.siren);
+  if (state.sirenStopTimer) clearTimeout(state.sirenStopTimer);
+  state.siren = null;
+  state.sirenStopTimer = null;
+}
+
+function speak(message) {
+  try {
+    if (!('speechSynthesis' in window)) return;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(new SpeechSynthesisUtterance(message));
+  } catch {}
+}
+
+function desktopNotify(title, body) {
+  try {
+    if ('Notification' in window && Notification.permission === 'granted') new Notification(title, { body });
+  } catch {}
+}
+
+function setupSSE() {
+  const source = new EventSource('/api/events');
+  source.onopen = () => { $('conn-dot').className = 'w-2 h-2 rounded-full bg-emerald-500'; $('conn-text').textContent = 'Live'; };
+  source.onerror = () => { $('conn-dot').className = 'w-2 h-2 rounded-full bg-amber-400'; $('conn-text').textContent = 'Reconnecting'; };
+  source.onmessage = event => {
+    let payload; try { payload = JSON.parse(event.data); } catch { return; }
+    if (payload.type === 'CONNECTED') return;
+    const data = payload.data || {};
+    const isPatient = state.user.role === 'patient';
+
+    if (payload.type === 'MEDICATIONS_UPDATED' && isPatient && data.added_by !== state.user.name) {
+      const detail = `${data.name || 'Medicine'}${data.dose ? ' ' + data.dose : ''} at ${data.schedule_time || 'its scheduled time'}`;
+      playChime();
+      speak(`New medicine added: ${detail}`);
+      showToast('New medicine scheduled', `${data.added_by || 'Your caregiver'} added ${detail}.`, 'success');
+      desktopNotify('New medicine scheduled', detail);
+    }
+    if (payload.type === 'MEDICATION_DUE') {
+      const detail = `${data.name || 'Medicine'}${data.dose ? ' ' + data.dose : ''} is due now`;
+      if (isPatient) {
+        playChime();
+        speak(`Time for your medicine: ${data.name || ''}`);
+        showToast('Time for your medicine', detail, 'warning');
+        desktopNotify('Time for your medicine', detail);
+      } else {
+        showToast('Medication due', detail, 'warning');
       }
     }
-
-    function initMap() {
-      const parentLat = 28.5355;
-      const parentLng = 77.2588;
-
-      mapInstance = L.map('hospital-map', { zoomControl: false }).setView([parentLat, parentLng], 13);
-      L.control.zoom({ position: 'bottomright' }).addTo(mapInstance);
-
-      // OpenStreetMap Tiles (Dark/Midnight friendly carto)
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-      }).addTo(mapInstance);
-
-      // Patient Marker (CR Park)
-      patientMarker = L.circleMarker([parentLat, parentLng], {
-        radius: 9,
-        fillColor: '#ef4444',
-        color: '#ffffff',
-        weight: 2,
-        opacity: 1,
-        fillOpacity: 0.9
-      }).addTo(mapInstance);
-      patientMarker.bindPopup('<b>Subir Sharma (Home)</b><br>B-42, CR Park, New Delhi');
-
-      // AIIMS Hospital Marker
-      hospitalMarker = L.circleMarker([28.5672, 77.2100], {
-        radius: 9,
-        fillColor: '#3b82f6',
-        color: '#ffffff',
-        weight: 2,
-        opacity: 1,
-        fillOpacity: 0.9
-      }).addTo(mapInstance);
-      hospitalMarker.bindPopup('<b>AIIMS Emergency Trauma Node</b><br>Dispatch Station');
+    if (payload.type === 'MEDICATION_ACKNOWLEDGED' && !isPatient) {
+      showToast('Medication update', `${data.by || 'Patient'} marked ${data.status}.`, 'success');
     }
-
-    function updateLiveClocks() {
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const fullDateStr = now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
-
-      const clockEl = document.getElementById('phone-clock');
-      const lockBigTime = document.getElementById('lock-big-time');
-      const lockBigDate = document.getElementById('lock-big-date');
-
-      if (clockEl) clockEl.textContent = timeStr;
-      if (lockBigTime) lockBigTime.textContent = timeStr;
-      if (lockBigDate) lockBigDate.textContent = fullDateStr;
+    if (payload.type === 'ALERT_CREATED' && isPatient) {
+      startSiren(false);
+      speak('New family alert: ' + data.message);
+      showToast('New family alert', data.message || 'Check your messages.', 'warning');
+      desktopNotify('ElderGuard alert', data.message);
     }
+    if (payload.type === 'SOS_CREATED') {
+      startSiren(true);
+      showToast('Emergency request', data.notes || 'An SOS was activated.', 'danger');
+      desktopNotify('Emergency request', 'An SOS was activated.');
+    }
+    clearTimeout(window._refreshTimer);
+    window._refreshTimer = setTimeout(refresh, 250);
+  };
+}
 
-    // ==============================================================
-    // 7. INITIALIZATION
-    // ==============================================================
-    window.onload = () => {
-      fetchState();
-      setupSSE();
-      initMap();
-      updateLiveClocks();
-      setInterval(updateLiveClocks, 1000);
-    };
-  </script>
+function registerServiceWorker() {
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+  if ('Notification' in window && Notification.permission === 'default') {
+    window.addEventListener('click', () => Notification.requestPermission().catch(() => {}), { once:true });
+  }
+}
+
+window.onload = async () => {
+  setupSosHold();
+  try {
+    const res = await api('/api/auth/me');
+    state.user = res.user;
+    await enterApp();
+  } catch {
+    setAuthTab('login');
+  }
+};
+</script>
 </body>
 </html>

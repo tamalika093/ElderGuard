@@ -1,0 +1,10 @@
+{
+  "name": "ElderGuard - Care Beyond Distance",
+  "short_name": "ElderGuard",
+  "description": "Simple medication reminders, family alerts and emergency help requests.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": []
+}
