@@ -7,11 +7,10 @@ A **simple, role-based prototype** for remote family care:
 3. SOS with live location shared with approved contacts and participating facilities.
 4. A caregiver dashboard for medicines, alerts and emergency status.
 
-This branch (`feature/elderguard-mvp`) is a deliberate simplification of the earlier
-hackathon demo. It removes the confusing triple-screen presentation, hardcoded
-patient data, simulated ambulance dispatch and fake lock screen.
-
-> **No changes were made to the `main` branch.**
+This MVP is a deliberate simplification of the earlier hackathon demo. It removes
+the confusing triple-screen presentation, hardcoded patient data, simulated
+ambulance dispatch and fake lock screen. The work was developed on
+`feature/elderguard-mvp` and merged into `main`.
 
 ---
 
