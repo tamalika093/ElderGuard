@@ -14,21 +14,6 @@ ambulance dispatch and fake lock screen. The work was developed on
 
 ---
 
-## What changed from the old version
-
-| Old problem | New behaviour |
-|---|---|
-| State lived only in memory; `STATE_FILE` was unused | SQLite database at `data/elderguard.db` is the source of truth. `data/state.json` is written as a readable debug snapshot. |
-| Anyone could change anything; no auth | Real accounts with salted PBKDF2 password hashes and signed session cookies. Roles: patient, caregiver, provider. |
-| Family access was assumed | Patients generate an invite code; caregivers request access; the patient explicitly approves it with permission flags. |
-| Patient / contacts / hospital were hardcoded in `server.py` | Everything is created through onboarding forms. There are no seeded accounts and the default database is empty. |
-| "Dispatch ambulance" pretended a real unit was sent | No dispatch endpoint exists. Facilities can only acknowledge or decline a **request**. Status never claims dispatch. |
-| Lock screen was drawn inside the webpage | No fake lock screen. The UI clearly states browser limitations. |
-| Browser siren implied locked-screen reliability | Banner and docs state that audio only works while the page is open. Native app + FCM is required for reliable background alerts. |
-| One global SSE stream leaked all data | Per-user authenticated SSE streams. Caregivers only receive events for patients who approved access. |
-
----
-
 ## Quick start
 
 ```powershell
@@ -167,5 +152,4 @@ Do not present the prototype as dispatching ambulances or guaranteeing locked-de
 | GET | `/api/provider/requests` | Facility inbox |
 | GET | `/api/events` | Authenticated per-user SSE |
 
-Full details are in `server.py`. The old `README (2).md` is kept for reference but
-describes the previous demo, not this simplified MVP.
+Full details are in `server.py`.
