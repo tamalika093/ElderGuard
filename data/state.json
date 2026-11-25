@@ -1,0 +1,15 @@
+{
+  "generated_at": "2026-11-25T12:38:32",
+  "source_of_truth": "C:\\Users\\Tamalika\\OneDrive\\Documents\\ElderGuard\\data\\elderguard.db",
+  "counts": {
+    "users": 5,
+    "relationships": 2,
+    "medications": 5,
+    "alerts": 8,
+    "sos_events": 8,
+    "deliveries": 71,
+    "audit_logs": 338,
+    "notifications": 65
+  },
+  "note": "Full records are stored in SQLite. This file is a debug snapshot."
+}
