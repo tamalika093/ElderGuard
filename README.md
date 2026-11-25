@@ -152,4 +152,5 @@ Do not present the prototype as dispatching ambulances or guaranteeing locked-de
 | GET | `/api/provider/requests` | Facility inbox |
 | GET | `/api/events` | Authenticated per-user SSE |
 
-Full details are in `server.py`.
+Full details are in `server.py`. The old `README (2).md` is kept for reference but
+describes the previous demo, not this simplified MVP.
